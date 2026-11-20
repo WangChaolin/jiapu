@@ -1,0 +1,22 @@
+appId: com.jiapu.app
+productName: 家谱管理软件
+directories:
+  output: release
+  buildResources: build
+files:
+  - out/**
+  - package.json
+asar: true
+win:
+  target: nsis
+  artifactName: jiapu-${version}-setup.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowElevation: true
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: 家谱管理软件
+  uninstallDisplayName: 家谱管理软件
+  deleteAppDataOnUninstall: false

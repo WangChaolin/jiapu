@@ -1,0 +1,294 @@
+:root {
+  color-scheme: light dark;
+  --jp-bg: light-dark(#f4f1ea, #16181c);
+  --jp-surface: light-dark(#fffdf8, #1e2228);
+  --jp-inset: light-dark(#f0ece1, #262b33);
+  --jp-ink: light-dark(#2e2a23, #e9e6df);
+  --jp-muted: light-dark(#7d7668, #9b968c);
+  --jp-line: light-dark(#ded7c5, #363d47);
+  --jp-accent: light-dark(#a03a28, #d4715a);
+  --jp-on-accent: light-dark(#ffffff, #1c1310);
+  --jp-blue: light-dark(#33526e, #82a8cc);
+  --jp-green: light-dark(#4f6b4a, #93b48d);
+  --jp-gold: light-dark(#a8823c, #d3b568);
+  --jp-paper: light-dark(#faf6ec, #22262d);
+  --jp-serif: "SimSun", "STSong", "Songti SC", serif;
+  --jp-sans: "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
+}
+:root[data-skin="light"] {
+  color-scheme: light;
+  --jp-bg:#f4f1ea;--jp-surface:#fffdf8;--jp-inset:#f0ece1;--jp-ink:#2e2a23;--jp-muted:#7d7668;
+  --jp-line:#ded7c5;--jp-accent:#a03a28;--jp-on-accent:#ffffff;--jp-blue:#33526e;--jp-green:#4f6b4a;
+  --jp-gold:#a8823c;--jp-paper:#faf6ec;
+}
+:root[data-skin="dark"] {
+  color-scheme: dark;
+  --jp-bg:#16181c;--jp-surface:#1e2228;--jp-inset:#262b33;--jp-ink:#e9e6df;--jp-muted:#9b968c;
+  --jp-line:#363d47;--jp-accent:#d4715a;--jp-on-accent:#1c1310;--jp-blue:#82a8cc;--jp-green:#93b48d;
+  --jp-gold:#d3b568;--jp-paper:#22262d;
+}
+:root[data-skin="classic"] {
+  color-scheme: light;
+  --jp-bg:#ece4cf;--jp-surface:#f7f1e0;--jp-inset:#efe7d2;--jp-ink:#3b3025;--jp-muted:#8a7a5f;
+  --jp-line:#d5c7a5;--jp-accent:#8f2f1f;--jp-on-accent:#f7f1e0;--jp-blue:#3d5468;--jp-green:#5c6f4a;
+  --jp-gold:#9c7a35;--jp-paper:#f9f4e4;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; }
+body {
+  font: 400 13px/1.6 var(--jp-sans);
+  color: var(--jp-ink);
+  background: var(--jp-bg);
+  -webkit-font-smoothing: antialiased;
+}
+#app { height: 100%; }
+
+/* 滚动条：取自调色板 */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--jp-inset); }
+::-webkit-scrollbar-thumb { background: var(--jp-line); border-radius: 6px; border: 2px solid var(--jp-inset); }
+::-webkit-scrollbar-thumb:hover { background: var(--jp-muted); }
+::-webkit-scrollbar-corner { background: var(--jp-inset); }
+
+button { font: inherit; color: inherit; background: var(--jp-inset); border: 1px solid var(--jp-line); border-radius: 6px; padding: 6px 12px; min-height: 32px; cursor: pointer; transition: background-color .15s, border-color .15s, color .15s; }
+button:hover { border-color: var(--jp-accent); }
+button.jp-primary { background: var(--jp-accent); border-color: var(--jp-accent); color: var(--jp-on-accent); font-weight: 500; }
+button.jp-primary:hover { filter: brightness(1.06); }
+button.jp-link { background: none; border: none; color: var(--jp-blue); padding: 2px 4px; min-height: 32px; }
+button.jp-link:hover { text-decoration: underline; }
+button.jp-danger { color: var(--jp-accent); }
+button[aria-pressed="true"] { border-color: var(--jp-accent); color: var(--jp-accent); font-weight: 500; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+input, select, textarea { font: inherit; color: var(--jp-ink); background: var(--jp-surface); border: 1px solid var(--jp-line); border-radius: 6px; padding: 6px 8px; min-height: 32px; max-width: 100%; }
+textarea { width: 100%; resize: vertical; }
+input[type="checkbox"] { min-height: auto; width: 15px; height: 15px; accent-color: var(--jp-accent); }
+label { display: inline-flex; align-items: center; gap: 6px; }
+h1, h2, h3 { margin: 0; font-weight: 500; }
+p { margin: 0; }
+:focus-visible { outline: 2px solid var(--jp-accent); outline-offset: 1px; }
+#app [hidden] { display: none !important; }
+
+.jp-muted { color: var(--jp-muted); font-size: 12px; }
+.jp-badge { display: inline-block; font-size: 11px; line-height: 1.4; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--jp-line); color: var(--jp-muted); white-space: nowrap; }
+.jp-badge-accent { color: var(--jp-accent); border-color: var(--jp-accent); }
+.jp-badge-blue { color: var(--jp-blue); border-color: var(--jp-blue); }
+.jp-badge-green { color: var(--jp-green); border-color: var(--jp-green); }
+.jp-badge-gold { color: var(--jp-gold); border-color: var(--jp-gold); }
+.jp-serif-c { font-family: var(--jp-serif); }
+
+/* 启动页 */
+.jp-home { height: 100%; overflow-y: auto; padding: 24px 16px; }
+.jp-seal { display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 48px; background: var(--jp-accent); color: var(--jp-on-accent); font-family: var(--jp-serif); font-size: 16px; font-weight: 500; border-radius: 6px; transform: rotate(-3deg); writing-mode: vertical-rl; letter-spacing: 2px; box-shadow: 0 2px 8px rgba(0,0,0,.18); }
+.jp-brand { display: flex; align-items: center; gap: 14px; justify-content: center; margin: 18px 0 6px; }
+.jp-brand-title { font-size: 20px; font-weight: 500; font-family: var(--jp-serif); letter-spacing: 4px; }
+.jp-home-sub { text-align: center; color: var(--jp-muted); font-size: 12px; margin-bottom: 20px; }
+.jp-home-wrap { max-width: 960px; margin: 0 auto; }
+.jp-gene-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
+.jp-gene-card { background: var(--jp-surface); border: 1px solid var(--jp-line); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 8px; transition: border-color .15s, box-shadow .15s; }
+.jp-gene-card:hover { border-color: var(--jp-accent); box-shadow: 0 3px 14px rgba(0,0,0,.08); }
+.jp-gene-name { font-size: 16px; font-weight: 500; font-family: var(--jp-serif); }
+.jp-gene-meta { display: flex; gap: 6px; flex-wrap: wrap; }
+.jp-gene-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto; padding-top: 8px; }
+.jp-gene-new { border-style: dashed; align-items: center; justify-content: center; text-align: center; color: var(--jp-muted); cursor: pointer; background: none; font: inherit; min-height: 160px; }
+.jp-gene-new:hover { color: var(--jp-accent); }
+.jp-new-form { background: var(--jp-surface); border: 1px solid var(--jp-line); border-radius: 12px; padding: 16px; margin-bottom: 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+.jp-field { display: flex; flex-direction: column; gap: 4px; }
+.jp-field > span { font-size: 12px; color: var(--jp-muted); }
+
+/* 应用外壳 */
+.jp-window { height: 100%; display: flex; flex-direction: column; background: var(--jp-bg); }
+.jp-titlebar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: var(--jp-surface); border-bottom: 1px solid var(--jp-line); padding: 9px 14px; flex: none; }
+.jp-titlebar .jp-title { font-size: 15px; font-weight: 500; font-family: var(--jp-serif); }
+.jp-titlebar .jp-spacer { flex: 1; }
+.jp-body { display: grid; grid-template-columns: 172px 1fr; flex: 1; min-height: 0; }
+.jp-sidebar { background: var(--jp-surface); border-right: 1px solid var(--jp-line); padding: 10px 8px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
+.jp-navbtn { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; background: none; border: 1px solid transparent; border-radius: 8px; padding: 8px 10px; min-height: 38px; color: var(--jp-ink); }
+.jp-navbtn:hover { background: var(--jp-inset); border-color: transparent; }
+.jp-navbtn[aria-current="page"] { background: var(--jp-inset); color: var(--jp-accent); font-weight: 500; border-color: var(--jp-line); }
+.jp-navbtn svg { flex: none; }
+.jp-nav-foot { margin-top: auto; padding: 10px 10px 2px; font-size: 11px; color: var(--jp-muted); border-top: 1px solid var(--jp-line); }
+.jp-main { padding: 16px; min-width: 0; overflow-y: auto; }
+.jp-page-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.jp-page-title { font-size: 16px; font-weight: 500; }
+.jp-toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+.jp-split { display: grid; grid-template-columns: 1fr 320px; gap: 14px; align-items: start; }
+.jp-split-pdf { grid-template-columns: 360px 1fr; }
+.jp-panel { background: var(--jp-surface); border: 1px solid var(--jp-line); border-radius: 10px; padding: 14px; }
+.jp-panel-title { font-size: 13px; font-weight: 500; margin-bottom: 10px; }
+
+/* 表格 */
+table.jp-table { width: 100%; border-collapse: collapse; background: var(--jp-surface); border: 1px solid var(--jp-line); border-radius: 10px; overflow: hidden; }
+.jp-table th { font-size: 12px; font-weight: 500; color: var(--jp-muted); text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--jp-line); background: var(--jp-inset); }
+.jp-table td { padding: 7px 10px; border-bottom: 1px solid var(--jp-line); }
+.jp-table tr:last-child td { border-bottom: none; }
+.jp-table tbody tr { cursor: pointer; }
+.jp-table tbody tr:hover { background: var(--jp-inset); }
+.jp-table tr.jp-selected { background: var(--jp-inset); box-shadow: inset 2px 0 0 var(--jp-accent); }
+.jp-table-wrap { border: 1px solid var(--jp-line); border-radius: 10px; overflow: auto; background: var(--jp-surface); }
+.jp-table-wrap .jp-table { border: none; border-radius: 0; }
+
+/* 详情 */
+.jp-detail-name { font-size: 16px; font-weight: 500; font-family: var(--jp-serif); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.jp-detail-tags { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+.jp-detail-sec { margin-top: 10px; }
+.jp-detail-sec h3 { font-size: 12px; color: var(--jp-muted); font-weight: 500; margin-bottom: 4px; }
+.jp-detail-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.jp-rel-list { display: flex; flex-direction: column; gap: 3px; }
+.jp-rel-item { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.jp-rel-item .jp-badge { font-size: 10px; padding: 1px 6px; }
+.jp-link-name { background: none; border: none; color: var(--jp-blue); cursor: pointer; padding: 0; min-height: auto; font: inherit; }
+.jp-link-name:hover { text-decoration: underline; }
+
+/* 成员卡片列表（内联详情） */
+.jp-member-list { display: flex; flex-direction: column; gap: 12px; }
+.jp-member-card { background: var(--jp-surface); border: 1px solid var(--jp-line); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+.jp-member-card:hover { border-color: var(--jp-accent); box-shadow: 0 3px 14px rgba(0,0,0,.07); }
+.jp-member-card.jp-focused { border-color: var(--jp-accent); box-shadow: inset 0 0 0 1px var(--jp-accent), 0 3px 14px rgba(0,0,0,.08); }
+.jp-mc-head { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.jp-mc-seal { flex: none; width: 42px; height: 42px; border-radius: 8px; background: var(--jp-accent); color: var(--jp-on-accent); font-family: var(--jp-serif); font-size: 13px; letter-spacing: 1px; writing-mode: vertical-rl; display: flex; align-items: center; justify-content: center; transform: rotate(-2deg); box-shadow: 0 2px 6px rgba(0,0,0,.16); }
+.jp-mc-seal.jp-female { background: var(--jp-blue); }
+.jp-mc-photo { flex: none; width: 48px; height: 48px; object-fit: cover; border-radius: 8px; border: 1px solid var(--jp-line); }
+.jp-mc-id { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 6px; }
+.jp-mc-name { font-family: var(--jp-serif); font-size: 18px; font-weight: 500; letter-spacing: 1px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.jp-mc-name .jp-muted { font-size: 13px; letter-spacing: 0; font-family: var(--jp-sans); }
+.jp-mc-tags { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.jp-mc-actions { display: flex; gap: 6px; flex-wrap: wrap; flex: none; margin-left: auto; }
+.jp-mc-body { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px 20px; border-top: 1px dashed var(--jp-line); padding-top: 12px; }
+.jp-mc-sec { min-width: 0; }
+.jp-mc-sec h4 { font-size: 11px; color: var(--jp-muted); font-weight: 500; letter-spacing: 1px; margin: 0 0 4px; }
+.jp-mc-sec p { font-size: 12.5px; line-height: 1.7; }
+.jp-mc-sec.jp-mc-wide { grid-column: 1 / -1; }
+.jp-mc-k { display: inline-block; font-size: 11px; color: var(--jp-muted); border: 1px solid var(--jp-line); border-radius: 4px; padding: 0 4px; margin-right: 6px; }
+.jp-mc-rels { display: flex; flex-wrap: wrap; gap: 6px; }
+.jp-mc-rel { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; background: var(--jp-inset); border: 1px solid var(--jp-line); border-radius: 999px; padding: 2px 9px; }
+.jp-mc-rel .jp-badge { font-size: 10px; padding: 0 5px; border: none; }
+.jp-mc-rel .jp-muted { font-size: 11px; }
+.jp-mc-bio { white-space: pre-wrap; color: var(--jp-ink); }
+.jp-mc-bio.jp-clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.jp-mc-bio-toggle { font-size: 12px; padding: 0 4px; min-height: auto; margin-top: 2px; }
+@media (max-width: 760px) {
+  .jp-mc-actions { margin-left: 0; width: 100%; }
+  .jp-mc-seal { width: 36px; height: 36px; font-size: 12px; }
+  .jp-mc-name { font-size: 16px; }
+}
+
+/* 表单 */
+.jp-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+.jp-form-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.jp-form-row .jp-field { flex: 1; min-width: 130px; }
+.jp-relrow { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+.jp-relrow select { flex: 1; min-width: 110px; }
+.jp-tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+.jp-date-hint { font-size: 11px; color: var(--jp-muted); margin-top: 2px; min-height: 16px; }
+.jp-date-hint.jp-warn { color: var(--jp-accent); }
+.jp-photo-thumb { width: 56px; height: 56px; object-fit: cover; border-radius: 6px; border: 1px solid var(--jp-line); }
+
+/* 图谱 */
+.jp-graph-wrap { background: var(--jp-surface); border: 1px solid var(--jp-line); border-radius: 10px; overflow: hidden; position: relative; }
+.jp-graph-wrap svg { width: 100%; height: 560px; display: block; cursor: grab; touch-action: none; }
+.jp-graph-wrap svg.jp-panning { cursor: grabbing; }
+.jp-gnode { cursor: pointer; }
+.jp-gnode rect { fill: var(--jp-surface); stroke: var(--jp-line); stroke-width: 1; }
+.jp-gnode:hover rect { stroke: var(--jp-accent); }
+.jp-gnode.jp-female rect { stroke: var(--jp-blue); }
+.jp-gnode.jp-spouse rect { fill: var(--jp-inset); }
+.jp-gnode.jp-active rect { stroke: var(--jp-accent); stroke-width: 2; }
+.jp-gnode.jp-dim { opacity: .16; }
+.jp-gnode text { fill: var(--jp-ink); font-size: 13px; font-weight: 500; }
+.jp-gnode .jp-gsub { fill: var(--jp-muted); font-size: 10px; font-weight: 400; }
+.jp-gnode .jp-gtag { fill: var(--jp-blue); font-size: 10px; font-weight: 400; }
+.jp-gnode .jp-gcollapse { fill: var(--jp-gold); font-size: 10px; }
+.jp-gedge { stroke: var(--jp-muted); stroke-width: 1.2; fill: none; }
+.jp-gedge-dashed { stroke: var(--jp-gold); stroke-dasharray: 5 4; }
+.jp-gedge-dim { opacity: .1; }
+.jp-gedge-spouse { stroke: var(--jp-muted); stroke-width: 1.2; }
+.jp-glabel { fill: var(--jp-gold); font-size: 11px; }
+.jp-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--jp-muted); margin-top: 8px; }
+.jp-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.jp-legend i { display: inline-block; width: 22px; height: 0; border-top: 2px solid var(--jp-muted); }
+.jp-legend i.jp-lg-dash { border-top-style: dashed; border-color: var(--jp-gold); }
+.jp-legend i.jp-lg-marry { border-top: 3px double var(--jp-muted); }
+.jp-legend i.jp-lg-female { border-top: 2px solid var(--jp-blue); }
+
+/* 字辈 */
+.jp-zibei-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 8px; margin-top: 12px; }
+.jp-zibei-cell { background: var(--jp-surface); border: 1px solid var(--jp-line); border-radius: 8px; padding: 8px 4px; text-align: center; }
+.jp-zibei-char { font-size: 22px; font-family: var(--jp-serif); font-weight: 500; color: var(--jp-accent); }
+.jp-zibei-gen { font-size: 11px; color: var(--jp-muted); }
+.jp-zibei-mismatch { border-color: var(--jp-gold); }
+
+/* 支系 */
+.jp-branch-tree { display: flex; flex-direction: column; gap: 2px; }
+.jp-branch-btn { display: flex; justify-content: space-between; gap: 8px; width: 100%; text-align: left; background: none; border: 1px solid transparent; border-radius: 8px; padding: 7px 10px; min-height: 34px; }
+.jp-branch-btn:hover { background: var(--jp-inset); }
+.jp-branch-btn[aria-pressed="true"] { background: var(--jp-inset); border-color: var(--jp-line); color: var(--jp-accent); font-weight: 500; }
+.jp-branch-kids { margin-left: 16px; border-left: 1px solid var(--jp-line); padding-left: 8px; display: flex; flex-direction: column; gap: 2px; }
+.jp-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* PDF */
+.jp-layout-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+.jp-layout-card { background: var(--jp-surface); border: 1px solid var(--jp-line); border-radius: 10px; padding: 12px; text-align: left; cursor: pointer; min-height: 96px; display: flex; flex-direction: column; gap: 4px; }
+.jp-layout-card[aria-pressed="true"] { border-color: var(--jp-accent); box-shadow: inset 0 0 0 1px var(--jp-accent); }
+.jp-layout-name { font-weight: 500; }
+.jp-layout-desc { font-size: 12px; color: var(--jp-muted); }
+.jp-preview-frame { width: 100%; height: 620px; border: 1px solid var(--jp-line); border-radius: 10px; background: var(--jp-paper); }
+
+/* 备份 / 设置 */
+.jp-confirm { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: var(--jp-inset); border: 1px solid var(--jp-gold); border-radius: 8px; padding: 10px 12px; margin: 10px 0; }
+.jp-skin-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+.jp-skin-card { background: var(--jp-surface); border: 1px solid var(--jp-line); border-radius: 10px; padding: 12px; text-align: left; cursor: pointer; display: flex; flex-direction: column; gap: 8px; min-height: 88px; }
+.jp-skin-card[aria-pressed="true"] { border-color: var(--jp-accent); box-shadow: inset 0 0 0 1px var(--jp-accent); }
+.jp-swatches { display: flex; gap: 4px; }
+.jp-swatches i { width: 22px; height: 22px; border-radius: 5px; border: 1px solid rgba(0,0,0,.15); }
+.jp-set-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 12px 0; border-bottom: 1px solid var(--jp-line); }
+.jp-set-row:last-child { border-bottom: none; }
+.jp-set-label { min-width: 96px; font-weight: 500; }
+code.jp-code { font-family: Consolas, "Courier New", monospace; font-size: 12px; background: var(--jp-inset); border: 1px solid var(--jp-line); border-radius: 5px; padding: 3px 8px; word-break: break-all; }
+
+/* 弹窗 */
+.jp-modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,.42); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 20px; }
+.jp-modal { background: var(--jp-surface); border: 1px solid var(--jp-line); border-radius: 12px; padding: 20px; max-width: 460px; width: 100%; box-shadow: 0 12px 40px rgba(0,0,0,.3); }
+.jp-modal h3 { font-size: 15px; margin-bottom: 10px; font-family: var(--jp-serif); }
+.jp-modal-body { margin-bottom: 16px; color: var(--jp-ink); white-space: pre-line; }
+.jp-modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* 提示条 */
+.jp-toast-wrap { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 200; display: flex; flex-direction: column; gap: 8px; align-items: center; max-width: 90vw; }
+.jp-toast { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: var(--jp-ink); color: var(--jp-bg); border-radius: 8px; padding: 9px 16px; box-shadow: 0 6px 24px rgba(0,0,0,.28); animation: jp-toast-in .2s ease; }
+.jp-toast button { background: none; border: 1px solid var(--jp-bg); color: var(--jp-bg); min-height: 28px; padding: 3px 10px; }
+.jp-toast.jp-toast-err { background: var(--jp-accent); color: var(--jp-on-accent); }
+.jp-toast.jp-toast-err button { border-color: var(--jp-on-accent); color: var(--jp-on-accent); }
+@keyframes jp-toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+.jp-empty { text-align: center; color: var(--jp-muted); padding: 40px 16px; }
+.jp-empty-seal { font-family: var(--jp-serif); font-size: 30px; color: var(--jp-line); margin-bottom: 8px; }
+.jp-stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.jp-stat { background: var(--jp-surface); border: 1px solid var(--jp-line); border-radius: 10px; padding: 12px; }
+.jp-stat-value { font-size: 22px; font-weight: 500; font-family: var(--jp-serif); color: var(--jp-accent); }
+.jp-stat-label { font-size: 12px; color: var(--jp-muted); }
+
+@media (max-width: 1000px) {
+  .jp-split { grid-template-columns: 1fr; }
+  .jp-split-pdf { grid-template-columns: 1fr; }
+  .jp-form-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 760px) {
+  .jp-body { grid-template-columns: 56px 1fr; }
+  .jp-sidebar { padding: 8px 6px; align-items: center; }
+  .jp-navbtn { width: 40px; min-height: 40px; justify-content: center; padding: 0; }
+  .jp-navbtn .jp-navtext { display: none; }
+  .jp-navbtn[aria-current="page"] { box-shadow: inset 2px 0 0 var(--jp-accent); }
+  .jp-nav-foot { display: none; }
+  .jp-layout-cards { grid-template-columns: 1fr; }
+}
+@media (max-width: 480px) {
+  .jp-body { grid-template-columns: 48px 1fr; }
+  .jp-sidebar { padding: 6px 4px; }
+  .jp-navbtn { width: 36px; min-height: 36px; }
+  .jp-main { padding: 12px; }
+  .jp-col-opt { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #app *, .jp-toast { transition: none !important; animation: none !important; }
+}
