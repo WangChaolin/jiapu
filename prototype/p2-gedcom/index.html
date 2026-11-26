@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="zh-CN" data-skin="classic">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>家谱管理软件 · P2 GEDCOM 原型</title>
+  <link rel="stylesheet" href="../../src/styles.css">
+  <style>
+    body { overflow: hidden; }
+    .proto-main { padding: 18px 20px 28px; }
+    .proto-screen { display: none; }
+    .proto-screen.active { display: block; animation: proto-in .18s ease-out; }
+    @keyframes proto-in { from { opacity: .45; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+    .proto-version { font-size: 11px; color: var(--jp-gold); border: 1px solid var(--jp-gold); border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
+    .proto-note { display: flex; align-items: center; gap: 12px; padding: 10px 14px; margin-bottom: 14px; border: 1px dashed var(--jp-gold); border-radius: 10px; background: var(--jp-paper); color: var(--jp-muted); font-size: 12px; }
+    .proto-note b { color: var(--jp-ink); font-weight: 500; }
+    .proto-note-seal { flex: none; width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; background: var(--jp-gold); color: var(--jp-paper); border-radius: 5px; font: 500 15px var(--jp-serif); transform: rotate(-2deg); }
+    .proto-head-actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+    .proto-feature-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .proto-feature { min-height: 190px; padding: 20px; border: 1px solid var(--jp-line); border-radius: 12px; background: var(--jp-surface); display: flex; flex-direction: column; gap: 10px; }
+    .proto-feature:hover { border-color: var(--jp-accent); box-shadow: 0 5px 18px rgba(70,45,20,.07); }
+    .proto-feature-no { font: 500 30px var(--jp-serif); color: var(--jp-line); }
+    .proto-feature h3 { font: 500 20px var(--jp-serif); letter-spacing: 1px; }
+    .proto-feature p { color: var(--jp-muted); font-size: 13px; line-height: 1.8; }
+    .proto-flow { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto; }
+    .proto-flow span { font-size: 11px; color: var(--jp-muted); background: var(--jp-inset); border: 1px solid var(--jp-line); border-radius: 999px; padding: 2px 8px; }
+    .proto-summary { margin-top: 14px; display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 14px; }
+    .proto-summary .jp-panel { min-height: 142px; }
+    .proto-check-list { margin: 4px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 7px; font-size: 12.5px; }
+    .proto-check-list li { display: flex; gap: 8px; align-items: flex-start; }
+    .proto-check-list li::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--jp-green); margin-top: 7px; flex: none; }
+    .proto-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+    .proto-kpi { padding: 12px 14px; border: 1px solid var(--jp-line); border-radius: 10px; background: var(--jp-surface); }
+    .proto-kpi strong { display: block; font: 500 23px var(--jp-serif); color: var(--jp-accent); }
+    .proto-kpi span { color: var(--jp-muted); font-size: 12px; }
+    .proto-stepper { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; padding: 10px 14px; border: 1px solid var(--jp-line); border-radius: 10px; background: var(--jp-surface); }
+    .proto-step { display: flex; align-items: center; gap: 7px; color: var(--jp-muted); font-size: 12px; }
+    .proto-step i { width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; border: 1px solid var(--jp-line); font-style: normal; background: var(--jp-inset); }
+    .proto-step.active { color: var(--jp-accent); font-weight: 600; }
+    .proto-step.active i { background: var(--jp-accent); border-color: var(--jp-accent); color: var(--jp-on-accent); }
+    .proto-step.done i { background: var(--jp-green); border-color: var(--jp-green); color: white; }
+    .proto-step-line { flex: 1; height: 1px; background: var(--jp-line); }
+    .proto-two-col { display: grid; grid-template-columns: 390px 1fr; gap: 14px; align-items: start; }
+    .proto-dropzone { min-height: 170px; border: 1.5px dashed var(--jp-gold); border-radius: 10px; background: var(--jp-paper); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; padding: 20px; }
+    .proto-dropzone strong { font: 500 18px var(--jp-serif); }
+    .proto-dropzone span { color: var(--jp-muted); font-size: 12px; }
+    .proto-file-card { display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--jp-line); border-radius: 9px; background: var(--jp-inset); margin-top: 12px; }
+    .proto-file-icon { width: 42px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 6px; background: var(--jp-accent); color: white; font: 600 11px var(--jp-sans); }
+    .proto-file-card b { display: block; font-size: 13px; }
+    .proto-file-card small { color: var(--jp-muted); }
+    .proto-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .proto-table th, .proto-table td { border-bottom: 1px solid var(--jp-line); padding: 8px 9px; text-align: left; vertical-align: top; }
+    .proto-table th { color: var(--jp-muted); font-weight: 500; background: var(--jp-inset); }
+    .proto-table tr:last-child td { border-bottom: 0; }
+    .proto-status { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; white-space: nowrap; }
+    .proto-status.ok { color: var(--jp-green); }
+    .proto-status.warn { color: var(--jp-gold); }
+    .proto-status.err { color: var(--jp-accent); }
+    .proto-callout { border-left: 3px solid var(--jp-gold); padding: 10px 12px; background: var(--jp-inset); color: var(--jp-muted); font-size: 12px; line-height: 1.8; margin-top: 12px; }
+    .proto-callout strong { color: var(--jp-ink); }
+    .proto-map-row { display: grid; grid-template-columns: 120px 1fr 90px; gap: 8px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--jp-line); font-size: 12px; }
+    .proto-map-row:last-child { border-bottom: 0; }
+    .proto-map-row code { color: var(--jp-accent); font-size: 11.5px; }
+    .proto-map-row select { width: 100%; }
+    .proto-issue-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+    .proto-issue { padding: 10px 11px; border: 1px solid var(--jp-line); border-radius: 8px; background: var(--jp-paper); font-size: 12px; }
+    .proto-issue b { display: block; margin-bottom: 3px; }
+    .proto-issue span { color: var(--jp-muted); }
+    .proto-code { max-height: 350px; overflow: auto; margin: 0; padding: 16px; border-radius: 9px; background: #27251f; color: #eee5cf; font: 12px/1.75 Consolas, monospace; white-space: pre; }
+    .proto-result { text-align: center; padding: 26px 20px; }
+    .proto-result-seal { width: 66px; height: 66px; margin: 0 auto 14px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--jp-green); color: white; font: 500 30px var(--jp-serif); }
+    .proto-result h3 { font: 500 24px var(--jp-serif); margin-bottom: 7px; }
+    .proto-result p { color: var(--jp-muted); font-size: 13px; }
+    .proto-screen-footer { display: flex; justify-content: space-between; gap: 16px; margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--jp-line); color: var(--jp-muted); font-size: 11.5px; }
+    .proto-badge-row { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+  </style>
+</head>
+<body>
+<div class="jp-window">
+  <header class="jp-titlebar">
+    <button class="jp-link" data-screen-link="overview">P2 原型首页</button>
+    <span class="jp-title">张家家谱 · 百忍堂</span>
+    <span class="jp-badge jp-badge-blue">128 人 · 6 世</span>
+    <span class="jp-spacer"></span>
+    <span class="proto-version">交互原型 v0.1</span>
+    <label class="jp-muted">皮肤 <select aria-label="原型皮肤"><option>古典中国风</option></select></label>
+  </header>
+  <div class="jp-body">
+    <nav class="jp-sidebar" aria-label="P2 GEDCOM 原型导航">
+      <button class="jp-navbtn" data-screen-link="overview"><span>◇</span><span class="jp-navtext">GEDCOM 总览</span></button>
+      <button class="jp-navbtn" data-screen-link="import-file"><span>1</span><span class="jp-navtext">导入 · 文件预检</span></button>
+      <button class="jp-navbtn" data-screen-link="import-review"><span>2</span><span class="jp-navtext">导入 · 映射查重</span></button>
+      <button class="jp-navbtn" data-screen-link="import-confirm"><span>3</span><span class="jp-navtext">导入 · 兼容确认</span></button>
+      <button class="jp-navbtn" data-screen-link="import-result"><span>4</span><span class="jp-navtext">导入 · 结果报告</span></button>
+      <button class="jp-navbtn" data-screen-link="export"><span>出</span><span class="jp-navtext">导出 GEDCOM</span></button>
+      <div class="jp-nav-foot">张氏 · 百忍堂<br>P2-1 设计确认稿<br>示例数据，不落库</div>
+    </nav>
+    <main class="jp-main proto-main">
+      <div class="proto-note">
+        <span class="proto-note-seal">稿</span>
+        <span><b>P2-1 GEDCOM 5.5.1 原型：</b>确认导入预检、字段映射、特殊关系兼容提示与导出设置；所有按钮仅演示，不会修改真实家谱数据。</span>
+      </div>
+
+      <section class="proto-screen active" data-screen="overview">
+        <div class="jp-page-head">
+          <h2 class="jp-page-title jp-serif-c">GEDCOM 数据交换</h2>
+          <span class="jp-muted">标准 5.5.1 导入与导出 · 预检优先 · 本地扩展关系明确提示</span>
+          <div class="proto-head-actions"><button data-screen-link="export">导出当前家谱</button></div>
+        </div>
+        <div class="proto-feature-grid">
+          <article class="proto-feature">
+            <span class="proto-feature-no">01</span><h3>导入 GEDCOM</h3>
+            <p>读取个人、家庭、事件、日期、地点、备注与照片；导入前展示记录数、疑似重复、不支持标签和乱码风险，不覆盖现有成员。</p>
+            <div class="proto-flow"><span>文件预检</span><span>字段映射</span><span>查重确认</span><span>兼容提示</span><span>结果报告</span></div>
+            <div class="jp-detail-actions"><button class="jp-primary" data-screen-link="import-file">选择 GEDCOM 文件</button></div>
+          </article>
+          <article class="proto-feature">
+            <span class="proto-feature-no">02</span><h3>导出 GEDCOM</h3>
+            <p>将成员、家庭、关系、日期、地点、备注与照片映射为标准标签；兼祧、过继等本地扩展关系附兼容性说明。</p>
+            <div class="proto-flow"><span>导出范围</span><span>标签映射</span><span>照片与备注</span><span>文件预览</span><span>保存文件</span></div>
+            <div class="jp-detail-actions"><button class="jp-primary" data-screen-link="export">配置导出</button></div>
+          </article>
+        </div>
+        <div class="proto-summary">
+          <div class="jp-panel">
+            <div class="jp-panel-title">标准兼容范围</div>
+            <ul class="proto-check-list"><li>INDI / FAM 个人与家庭记录</li><li>NAME / SEX / BIRT / DEAT / BURI 等常用标签</li><li>DATE / PLAC / NOTE / OBJE / SOUR 事件与来源</li><li>UTF-8 与常见 ANSI 中文编码识别</li></ul>
+          </div>
+          <div class="jp-panel">
+            <div class="jp-panel-title">本地扩展关系</div>
+            <p class="jp-muted">生 / 养 / 继 / 嗣 / 兼祧父母关系尽量映射到 PEDI / ADOP / FOST 等标准标签；无法完整表达的关系保留备注并生成兼容性报告。</p>
+          </div>
+          <div class="jp-panel">
+            <div class="jp-panel-title">安全与回滚</div>
+            <p class="jp-muted">导入采用事务执行，失败整体回滚；成功后记录导入批次并支持撤销。GEDCOM 仅作为数据文本解析，不执行任何脚本。</p>
+          </div>
+        </div>
+        <div class="proto-screen-footer"><span>下一步建议：先完成 GEDCOM 导入/导出，再推进自定义皮肤。</span><span>云同步仍不进入当前迭代。</span></div>
+      </section>
+
+      <section class="proto-screen" data-screen="import-file">
+        <div class="jp-page-head">
+          <h2 class="jp-page-title jp-serif-c">导入 GEDCOM · 文件预检</h2>
+          <span class="jp-muted">先检查格式、编码、记录规模与风险，再进入映射</span>
+          <div class="proto-head-actions"><button data-screen-link="overview">取消导入</button></div>
+        </div>
+        <div class="proto-stepper">
+          <span class="proto-step active"><i>1</i>文件预检</span><span class="proto-step-line"></span>
+          <span class="proto-step"><i>2</i>映射与查重</span><span class="proto-step-line"></span>
+          <span class="proto-step"><i>3</i>兼容确认</span><span class="proto-step-line"></span>
+          <span class="proto-step"><i>4</i>完成</span>
+        </div>
+        <div class="proto-two-col">
+          <div class="jp-panel">
+            <div class="jp-panel-title">选择文件</div>
+            <div class="proto-dropzone"><strong>拖入 .ged 文件</strong><span>或点击选择本机文件 · 建议不超过 50 MB</span><button class="jp-primary">选择文件…</button></div>
+            <div class="proto-file-card"><span class="proto-file-icon">GED</span><div style="flex:1"><b>zhang-family-2026.ged</b><small>1.8 MB · UTF-8 · GEDCOM 5.5.1</small></div><span class="proto-status ok">✓ 可读取</span></div>
+            <div class="proto-callout"><strong>编码检测：</strong>文件包含中文姓名，已识别为 UTF-8；未发现乱码特征。若源文件为 ANSI，将在导入前提供编码手动选择。</div>
+          </div>
+          <div class="jp-panel">
+            <div class="jp-panel-title">预检结果</div>
+            <div class="proto-kpis" style="margin-top:12px">
+              <div class="proto-kpi"><strong>128</strong><span>个人 INDI</span></div><div class="proto-kpi"><strong>46</strong><span>家庭 FAM</span></div><div class="proto-kpi"><strong>312</strong><span>事件记录</span></div><div class="proto-kpi"><strong>18</strong><span>照片 OBJE</span></div>
+            </div>
+            <table class="proto-table">
+              <thead><tr><th>检查项</th><th>结果</th><th>说明</th></tr></thead>
+              <tbody>
+                <tr><td>文件结构</td><td><span class="proto-status ok">✓ 通过</span></td><td>层级标签闭合，HEAD / TRLR 完整</td></tr>
+                <tr><td>字符编码</td><td><span class="proto-status ok">✓ UTF-8</span></td><td>中文姓名与备注未发现替换字符</td></tr>
+                <tr><td>日期格式</td><td><span class="proto-status warn">! 1 条异常</span></td><td>I128 的 BIRT 日期无法解析，将保留原文</td></tr>
+                <tr><td>疑似重复</td><td><span class="proto-status warn">! 2 组</span></td><td>姓名、性别与出生日期组合命中现有成员</td></tr>
+                <tr><td>不支持标签</td><td><span class="proto-status warn">! 3 类</span></td><td>_UID、_TODO、AFN，将跳过或写入备注</td></tr>
+                <tr><td>照片文件</td><td><span class="proto-status ok">✓ 18 个</span></td><td>均为 JPG，导入后复制到家谱照片目录</td></tr>
+              </tbody>
+            </table>
+            <div class="proto-callout"><strong>不会覆盖现有数据：</strong>命中重复的成员必须由你选择“跳过”或“仍作为新成员导入”，系统不会自动合并。</div>
+            <div class="jp-detail-actions" style="margin-top:14px"><button data-screen-link="overview">返回</button><button class="jp-primary" data-screen-link="import-review">下一步：映射与查重</button></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="proto-screen" data-screen="import-review">
+        <div class="jp-page-head">
+          <h2 class="jp-page-title jp-serif-c">导入 GEDCOM · 映射与查重</h2>
+          <span class="jp-muted">标准标签自动映射，可调整；重复成员逐组确认</span>
+          <div class="proto-head-actions"><button data-screen-link="import-file">上一步</button><button class="jp-primary" data-screen-link="import-confirm">下一步：兼容确认</button></div>
+        </div>
+        <div class="proto-stepper">
+          <span class="proto-step done"><i>✓</i>文件预检</span><span class="proto-step-line"></span>
+          <span class="proto-step active"><i>2</i>映射与查重</span><span class="proto-step-line"></span>
+          <span class="proto-step"><i>3</i>兼容确认</span><span class="proto-step-line"></span>
+          <span class="proto-step"><i>4</i>完成</span>
+        </div>
+        <div class="proto-two-col" style="grid-template-columns:1.05fr .95fr">
+          <div class="jp-panel">
+            <div class="jp-panel-title">字段映射</div>
+            <div class="proto-map-row"><code>INDI.NAME</code><span>姓名</span><span class="proto-status ok">✓ 已映射</span></div>
+            <div class="proto-map-row"><code>INDI.SEX</code><span>性别</span><span class="proto-status ok">✓ 已映射</span></div>
+            <div class="proto-map-row"><code>BIRT.DATE</code><span>出生日期</span><span class="proto-status ok">✓ 已映射</span></div>
+            <div class="proto-map-row"><code>DEAT.DATE</code><span>卒日期</span><span class="proto-status ok">✓ 已映射</span></div>
+            <div class="proto-map-row"><code>BIRT.PLAC / DEAT.PLAC</code><span>出生地 / 卒地</span><select aria-label="出生地映射"><option>合并写入备注</option><option>居地</option><option>忽略</option></select></div>
+            <div class="proto-map-row"><code>OCCU</code><span>职业</span><span class="proto-status ok">✓ 已映射</span></div>
+            <div class="proto-map-row"><code>NOTE</code><span>备注</span><span class="proto-status ok">✓ 已映射</span></div>
+            <div class="proto-map-row"><code>OBJE.FILE</code><span>照片</span><select aria-label="照片映射"><option>复制到家谱照片目录</option><option>仅记录路径</option><option>忽略</option></select></div>
+            <div class="proto-map-row"><code>FAM.CHIL</code><span>父母子女关系</span><span class="proto-status ok">✓ 已映射</span></div>
+            <div class="proto-map-row"><code>FAM.SPOUSE</code><span>配偶关系</span><span class="proto-status ok">✓ 已映射</span></div>
+            <div class="proto-callout"><strong>世代与支系：</strong>GEDCOM 通常不包含世代和支系，将按父母关系自动推导世代；支系留空，可在导入后批量迁移。</div>
+          </div>
+          <div class="jp-panel">
+            <div class="jp-panel-title">疑似重复 · 2 组</div>
+            <div class="proto-issue-list">
+              <div class="proto-issue"><b>张心兰 · 女 · 1930-05-12</b><span>现有成员与导入记录姓名、性别、出生日期完全一致。</span><div class="proto-badge-row"><button>跳过导入</button><button class="jp-primary">仍作为新成员</button></div></div>
+              <div class="proto-issue"><b>张天德 · 男 · 1899-04-18</b><span>姓名、性别一致，出生日期相差 1 天，可能为日期格式差异。</span><div class="proto-badge-row"><button>跳过导入</button><button>仍作为新成员</button><button>查看对比</button></div></div>
+            </div>
+            <div class="jp-panel-title" style="margin-top:16px">特殊关系映射</div>
+            <table class="proto-table">
+              <thead><tr><th>GEDCOM</th><th>本地关系</th><th>处理</th></tr></thead>
+              <tbody>
+                <tr><td>PEDI = birth</td><td>生父 / 生母</td><td><span class="proto-status ok">标准映射</span></td></tr>
+                <tr><td>PEDI = adopted</td><td>养父 / 养母</td><td><span class="proto-status ok">标准映射</span></td></tr>
+                <tr><td>PEDI = foster</td><td>继父 / 继母</td><td><span class="proto-status warn">近似映射</span></td></tr>
+                <tr><td>_FREL / _MREL</td><td>嗣父 / 嗣母</td><td><span class="proto-status warn">保留备注</span></td></tr>
+                <tr><td>_JITI</td><td>兼祧父 / 兼祧母</td><td><span class="proto-status warn">保留备注</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="proto-screen-footer"><span>重复组不会自动合并；“仍作为新成员”会保留两条记录供后续人工查重。</span><span>映射调整会同步影响最终导入预览。</span></div>
+      </section>
+
+      <section class="proto-screen" data-screen="import-confirm">
+        <div class="jp-page-head">
+          <h2 class="jp-page-title jp-serif-c">导入 GEDCOM · 兼容确认</h2>
+          <span class="jp-muted">汇总无法标准表达的信息，确认后事务导入</span>
+          <div class="proto-head-actions"><button data-screen-link="import-review">上一步</button><button class="jp-primary" data-prototype-action="import-done">确认导入 126 人</button></div>
+        </div>
+        <div class="proto-stepper">
+          <span class="proto-step done"><i>✓</i>文件预检</span><span class="proto-step-line"></span>
+          <span class="proto-step done"><i>✓</i>映射与查重</span><span class="proto-step-line"></span>
+          <span class="proto-step active"><i>3</i>兼容确认</span><span class="proto-step-line"></span>
+          <span class="proto-step"><i>4</i>完成</span>
+        </div>
+        <div class="proto-kpis">
+          <div class="proto-kpi"><strong>126</strong><span>将导入成员</span></div><div class="proto-kpi"><strong>2</strong><span>重复组已跳过</span></div><div class="proto-kpi"><strong>46</strong><span>家庭关系</span></div><div class="proto-kpi"><strong>18</strong><span>照片</span></div>
+        </div>
+        <div class="proto-two-col" style="grid-template-columns:1.15fr .85fr">
+          <div class="jp-panel">
+            <div class="jp-panel-title">不支持标签与处理方式</div>
+            <table class="proto-table" style="margin-top:10px">
+              <thead><tr><th>标签</th><th>出现次数</th><th>默认处理</th><th>兼容性说明</th></tr></thead>
+              <tbody>
+                <tr><td><code>_UID</code></td><td>128</td><td><select aria-label="UID 处理"><option>写入备注</option><option>跳过</option></select></td><td>部分家谱软件的内部标识</td></tr>
+                <tr><td><code>_TODO</code></td><td>7</td><td><select aria-label="TODO 处理"><option>写入备注</option><option>跳过</option></select></td><td>待核实信息，不进入正式字段</td></tr>
+                <tr><td><code>AFN</code></td><td>19</td><td><select aria-label="AFN 处理"><option>写入备注</option><option>跳过</option></select></td><td>祖先文件编号，非通用标准</td></tr>
+                <tr><td><code>_FREL / _MREL</code></td><td>4</td><td><select aria-label="特殊关系处理"><option>保留原文到备注</option><option>跳过</option></select></td><td>本地过继关系无法被所有软件识别</td></tr>
+                <tr><td><code>_JITI</code></td><td>2</td><td><select aria-label="兼祧处理"><option>保留原文到备注</option><option>跳过</option></select></td><td>兼祧为本地扩展，导出时同样附说明</td></tr>
+              </tbody>
+            </table>
+            <div class="proto-callout"><strong>不会静默丢失：</strong>所有跳过或无法映射的标签都会写入导入报告，并可在结果页导出查看。</div>
+          </div>
+          <div class="jp-panel">
+            <div class="jp-panel-title">导入选项</div>
+            <div style="display:flex;flex-direction:column;gap:12px;margin-top:12px;font-size:13px">
+              <label><input type="checkbox" checked> 复制照片到家谱照片目录</label>
+              <label><input type="checkbox" checked> 将不支持标签保留到备注</label>
+              <label><input type="checkbox" checked> 自动推导世代</label>
+              <label><input type="checkbox"> 导入后打开成员查重</label>
+            </div>
+            <div class="jp-panel-title" style="margin-top:18px">执行保证</div>
+            <ul class="proto-check-list" style="margin-top:10px"><li>单个事务写入成员、关系与照片记录</li><li>任一步失败整体回滚</li><li>成功后生成可撤销导入批次</li><li>不覆盖现有成员与关系</li></ul>
+          </div>
+        </div>
+        <div class="proto-screen-footer"><span>点击“确认导入”后开始写入；耗时取决于成员与照片数量。</span><span>当前为原型演示，不会写入真实数据。</span></div>
+      </section>
+
+      <section class="proto-screen" data-screen="import-result">
+        <div class="jp-page-head">
+          <h2 class="jp-page-title jp-serif-c">导入 GEDCOM · 结果报告</h2>
+          <span class="jp-muted">成功、跳过、失败与兼容性提示一目了然</span>
+          <div class="proto-head-actions"><button data-screen-link="overview">完成</button></div>
+        </div>
+        <div class="proto-stepper">
+          <span class="proto-step done"><i>✓</i>文件预检</span><span class="proto-step-line"></span>
+          <span class="proto-step done"><i>✓</i>映射与查重</span><span class="proto-step-line"></span>
+          <span class="proto-step done"><i>✓</i>兼容确认</span><span class="proto-step-line"></span>
+          <span class="proto-step active"><i>4</i>完成</span>
+        </div>
+        <div class="jp-panel">
+          <div class="proto-result"><div class="proto-result-seal">✓</div><h3>GEDCOM 导入完成</h3><p>已导入 126 名成员、46 组家庭关系与 18 张照片；2 组重复记录按你的选择跳过。</p></div>
+          <div class="proto-kpis">
+            <div class="proto-kpi"><strong>126</strong><span>成功导入</span></div><div class="proto-kpi"><strong>2</strong><span>重复跳过</span></div><div class="proto-kpi"><strong>0</strong><span>失败</span></div><div class="proto-kpi"><strong>32</strong><span>兼容性提示</span></div>
+          </div>
+          <table class="proto-table">
+            <thead><tr><th>报告项</th><th>数量</th><th>处理结果</th></tr></thead>
+            <tbody>
+              <tr><td>个人记录 INDI</td><td>128</td><td>126 导入，2 重复跳过</td></tr>
+              <tr><td>家庭记录 FAM</td><td>46</td><td>全部导入</td></tr>
+              <tr><td>照片 OBJE</td><td>18</td><td>全部复制到家谱照片目录</td></tr>
+              <tr><td>无法解析日期</td><td>1</td><td>保留原文到备注</td></tr>
+              <tr><td>非标准标签</td><td>32</td><td>已保留到备注并列入报告</td></tr>
+            </tbody>
+          </table>
+          <div class="proto-callout"><strong>可撤销：</strong>本次导入作为一个批次记录，可在结果页立即撤销，或稍后从导入记录中撤销。</div>
+          <div class="jp-detail-actions" style="margin-top:14px"><button>导出问题报告</button><button>查看导入成员</button><button class="jp-danger" data-prototype-action="undo-done">撤销本次导入</button></div>
+        </div>
+      </section>
+
+      <section class="proto-screen" data-screen="export">
+        <div class="jp-page-head">
+          <h2 class="jp-page-title jp-serif-c">导出 GEDCOM 5.5.1</h2>
+          <span class="jp-muted">标准标签映射 · 特殊关系兼容说明 · 导出前预览</span>
+          <div class="proto-head-actions"><button data-screen-link="overview">返回</button></div>
+        </div>
+        <div class="proto-two-col" style="grid-template-columns:390px 1fr">
+          <div class="jp-panel">
+            <div class="jp-panel-title">导出设置</div>
+            <label class="jp-field" style="margin:12px 0"><span>导出范围</span><select aria-label="GEDCOM 导出范围"><option>整谱（128 人）</option><option>指定支系</option><option>指定世代</option><option>勾选成员</option></select></label>
+            <label class="jp-field" style="margin-bottom:12px"><span>GEDCOM 版本</span><select aria-label="GEDCOM 版本"><option>5.5.1</option><option>5.5</option></select></label>
+            <label class="jp-field" style="margin-bottom:12px"><span>字符编码</span><select aria-label="GEDCOM 编码"><option>UTF-8（推荐）</option><option>ANSI / GBK</option></select></label>
+            <div class="jp-panel-title">包含内容</div>
+            <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px;font-size:13px">
+              <label><input type="checkbox" checked> 成员基本信息与事件</label>
+              <label><input type="checkbox" checked> 父母、子女与配偶关系</label>
+              <label><input type="checkbox" checked> 备注与来源</label>
+              <label><input type="checkbox" checked> 照片（复制到导出目录）</label>
+              <label><input type="checkbox" checked> 兼祧 / 过继兼容性说明</label>
+            </div>
+            <div class="proto-callout"><strong>特殊关系：</strong>兼祧与过继会尽量映射到标准 PEDI / NOTE 标签，同时写入本地扩展说明，避免其他软件静默忽略。</div>
+            <div class="jp-detail-actions" style="margin-top:14px"><button>恢复默认</button><button class="jp-primary" data-prototype-action="export-done">预览并导出</button></div>
+          </div>
+          <div class="jp-panel">
+            <div class="proto-preview-bar"><span class="jp-panel-title" style="margin:0">文件预览</span><span class="jp-muted">zhang-family-2026.ged · 约 1.8 MB</span></div>
+            <pre class="proto-code">0 HEAD
+1 SOUR JIAPU
+2 VERS 1.0.0
+1 GEDC
+2 VERS 5.5.1
+2 FORM LINEAGE-LINKED
+1 CHAR UNICODE
+1 LANG Chinese
+0 @I001@ INDI
+1 NAME 张国栋 /张/
+1 SEX M
+1 BIRT
+2 DATE 12 MAR 1850
+2 PLAC 山东清河
+1 DEAT
+2 DATE 2 NOV 1921
+1 OCCU 修谱人
+1 NOTE 兼祧关系见本地扩展说明
+1 OBJE
+2 FILE photos/I001.jpg
+0 @I002@ INDI
+1 NAME 李秀兰 /李/
+1 SEX F
+1 BIRT
+2 DATE 6 JUN 1853
+0 @F001@ FAM
+1 HUSB @I001@
+1 WIFE @I002@
+1 CHIL @I003@
+1 MARR
+2 DATE 1872
+0 TRLR</pre>
+            <div class="proto-screen-footer"><span>预览仅展示前 30 行；实际导出包含全部成员、家庭、备注与照片。</span><span>导出不会修改家谱数据。</span></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+<div id="proto-toast" class="jp-toast" hidden></div>
+<script>
+  const screens = [...document.querySelectorAll('.proto-screen')]
+  const navButtons = [...document.querySelectorAll('.jp-navbtn')]
+  function showScreen(name) {
+    const target = screens.find((s) => s.dataset.screen === name) ?? screens[0]
+    screens.forEach((s) => s.classList.toggle('active', s === target))
+    navButtons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.screenLink === name)))
+    history.replaceState(null, '', '#' + name)
+  }
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('[data-screen-link]')
+    if (link) showScreen(link.dataset.screenLink)
+    const action = event.target.closest('[data-prototype-action]')
+    if (action) {
+      if (action.dataset.prototypeAction === 'import-done') showScreen('import-result')
+      if (action.dataset.prototypeAction === 'undo-done') toast('原型演示：本次导入已撤销')
+      if (action.dataset.prototypeAction === 'export-done') toast('原型演示：GEDCOM 文件已生成')
+    }
+  })
+  function toast(message) {
+    const el = document.querySelector('#proto-toast')
+    el.textContent = message
+    el.hidden = false
+    clearTimeout(window.__toastTimer)
+    window.__toastTimer = setTimeout(() => { el.hidden = true }, 2200)
+  }
+  showScreen(location.hash.slice(1) || 'overview')
+</script>
+</body>
+</html>

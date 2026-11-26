@@ -1,0 +1,836 @@
+<!doctype html>
+<html lang="zh-CN" data-skin="classic">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>家谱管理软件 · P1 高保真交互原型</title>
+  <link rel="stylesheet" href="../../src/styles.css">
+  <style>
+    body { overflow: hidden; }
+    .proto-main { padding: 18px 20px 28px; }
+    .proto-screen { display: none; }
+    .proto-screen.active { display: block; animation: proto-in .18s ease-out; }
+    @keyframes proto-in { from { opacity: .45; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+    .proto-version { font-size: 11px; color: var(--jp-gold); border: 1px solid var(--jp-gold); border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
+    .proto-note { display: flex; align-items: center; gap: 12px; padding: 10px 14px; margin-bottom: 14px; border: 1px dashed var(--jp-gold); border-radius: 10px; background: var(--jp-paper); color: var(--jp-muted); font-size: 12px; }
+    .proto-note b { color: var(--jp-ink); font-weight: 500; }
+    .proto-note-seal { flex: none; width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; background: var(--jp-gold); color: var(--jp-paper); border-radius: 5px; font: 500 15px var(--jp-serif); transform: rotate(-2deg); }
+    .proto-head-actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+    .proto-feature-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .proto-feature { position: relative; min-height: 172px; padding: 18px; border: 1px solid var(--jp-line); border-radius: 12px; background: var(--jp-surface); display: flex; flex-direction: column; gap: 9px; }
+    .proto-feature:hover { border-color: var(--jp-accent); box-shadow: 0 5px 18px rgba(70,45,20,.07); }
+    .proto-feature-no { position: absolute; right: 16px; top: 12px; font: 500 34px var(--jp-serif); color: var(--jp-line); }
+    .proto-feature h3 { font: 500 18px var(--jp-serif); letter-spacing: 1px; }
+    .proto-feature p { color: var(--jp-muted); font-size: 12.5px; max-width: 88%; }
+    .proto-flow { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+    .proto-flow span { font-size: 11px; color: var(--jp-muted); background: var(--jp-inset); border: 1px solid var(--jp-line); border-radius: 999px; padding: 2px 8px; }
+    .proto-feature .jp-detail-actions { margin-top: auto; }
+    .proto-summary { margin-top: 14px; display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 14px; }
+    .proto-summary .jp-panel { min-height: 128px; }
+    .proto-check-list { margin: 4px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 7px; font-size: 12.5px; }
+    .proto-check-list li { display: flex; gap: 8px; align-items: flex-start; }
+    .proto-check-list li::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--jp-green); margin-top: 7px; flex: none; }
+    .proto-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+    .proto-kpi { padding: 12px 14px; border: 1px solid var(--jp-line); border-radius: 10px; background: var(--jp-surface); }
+    .proto-kpi strong { display: block; font: 500 23px var(--jp-serif); color: var(--jp-accent); }
+    .proto-kpi span { color: var(--jp-muted); font-size: 12px; }
+    .proto-branch-grid { display: grid; grid-template-columns: 300px 1fr; gap: 14px; align-items: start; }
+    .proto-tree { display: flex; flex-direction: column; gap: 4px; }
+    .proto-tree-row { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; text-align: left; background: none; border: 1px solid transparent; }
+    .proto-tree-row[aria-pressed="true"] { background: var(--jp-inset); border-color: var(--jp-line); color: var(--jp-accent); }
+    .proto-tree-row small { color: var(--jp-muted); font-size: 11px; }
+    .proto-impact { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 12px 0; }
+    .proto-impact div { padding: 10px; border-radius: 8px; background: var(--jp-inset); border: 1px solid var(--jp-line); }
+    .proto-impact strong { display: block; font: 500 18px var(--jp-serif); }
+    .proto-impact span { font-size: 11px; color: var(--jp-muted); }
+    .proto-layout-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-bottom: 14px; }
+    .proto-layout { text-align: left; min-height: 78px; padding: 10px; display: flex; flex-direction: column; gap: 5px; background: var(--jp-surface); }
+    .proto-layout[aria-pressed="true"] { border-color: var(--jp-accent); box-shadow: inset 0 0 0 1px var(--jp-accent); color: var(--jp-accent); }
+    .proto-layout b { font: 500 13px var(--jp-serif); }
+    .proto-layout small { color: var(--jp-muted); font-size: 10.5px; line-height: 1.5; }
+    .proto-pdf-grid { display: grid; grid-template-columns: 340px 1fr; gap: 14px; align-items: start; }
+    .proto-preview-shell { border: 1px solid var(--jp-line); border-radius: 10px; background: var(--jp-inset); padding: 14px; }
+    .proto-paper { width: min(100%, 610px); min-height: 730px; margin: 0 auto; background: #fffdf7; color: #352d24; border: 1px solid #d8cdb6; box-shadow: 0 4px 18px rgba(60,40,20,.12); padding: 42px 46px; position: relative; font-family: var(--jp-serif); }
+    .proto-paper.landscape { width: min(100%, 850px); min-height: 570px; padding: 30px 34px; }
+    .proto-paper-title { text-align: center; font-size: 25px; letter-spacing: 6px; margin: 8px 0 4px; }
+    .proto-paper-sub { text-align: center; color: #8a765c; font-size: 12px; letter-spacing: 3px; margin-bottom: 24px; }
+    .proto-paper-rule { height: 1px; background: #b79a6d; margin: 16px 0 22px; }
+    .proto-person-head { display: flex; gap: 18px; align-items: center; border-bottom: 1px solid #d8cdb6; padding-bottom: 18px; margin-bottom: 18px; }
+    .proto-photo { width: 86px; height: 108px; border: 1px solid #cbb997; background: #f3eddf; display: flex; align-items: center; justify-content: center; color: #a08b6c; font-size: 12px; letter-spacing: 3px; writing-mode: vertical-rl; flex: none; }
+    .proto-person-name { font-size: 27px; letter-spacing: 4px; margin-bottom: 8px; }
+    .proto-person-meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px 18px; font-size: 12px; color: #675947; }
+    .proto-bio-section { margin-top: 16px; }
+    .proto-bio-section h4 { margin: 0 0 7px; font-size: 13px; color: #8f2f1f; letter-spacing: 2px; }
+    .proto-bio-section p { font-size: 13px; line-height: 2; text-align: justify; margin-bottom: 8px; }
+    .proto-page-foot { position: absolute; left: 46px; right: 46px; bottom: 24px; display: flex; justify-content: space-between; color: #9a8a70; font-size: 11px; border-top: 1px solid #e2d8c4; padding-top: 8px; }
+    .proto-paper.landscape .proto-page-foot { left: 34px; right: 34px; }
+    .proto-preview-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+    .proto-preview-bar .jp-tabs { margin: 0; }
+    .proto-table-paper { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+    .proto-table-paper th, .proto-table-paper td { border: 1px solid #cfc2a7; padding: 7px 8px; text-align: left; }
+    .proto-table-paper th { background: #f0e7d3; color: #5d4d38; font-weight: 500; }
+    .proto-table-paper tr:nth-child(even) td { background: #fbf7ed; }
+    .proto-field-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 7px 12px; margin: 8px 0 14px; font-size: 12px; }
+    .proto-graph-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    .proto-segmented { display: inline-flex; border: 1px solid var(--jp-line); border-radius: 7px; overflow: hidden; }
+    .proto-segmented button { border: 0; border-radius: 0; background: var(--jp-surface); }
+    .proto-segmented button + button { border-left: 1px solid var(--jp-line); }
+    .proto-segmented button[aria-pressed="true"] { background: var(--jp-accent); color: var(--jp-on-accent); }
+    .proto-graph-stage { background: var(--jp-surface); border: 1px solid var(--jp-line); border-radius: 10px; overflow: hidden; }
+    .proto-graph-stage svg { display: block; width: 100%; height: 480px; }
+    .proto-gnode { cursor: pointer; }
+    .proto-gnode rect { fill: var(--jp-surface); stroke: var(--jp-line); stroke-width: 1.2; }
+    .proto-gnode:hover rect, .proto-gnode.active rect { stroke: var(--jp-accent); stroke-width: 2; }
+    .proto-gnode.female rect { stroke: var(--jp-blue); }
+    .proto-gnode.spouse rect { fill: var(--jp-inset); }
+    .proto-gnode text { fill: var(--jp-ink); font: 500 13px var(--jp-sans); }
+    .proto-gnode .sub { fill: var(--jp-muted); font: 10px var(--jp-sans); }
+    .proto-gnode .female-tag { fill: var(--jp-blue); font: 10px var(--jp-sans); }
+    .proto-edge { stroke: var(--jp-muted); stroke-width: 1.2; fill: none; }
+    .proto-edge.special { stroke: var(--jp-gold); stroke-dasharray: 5 4; }
+    .proto-edge.spouse { stroke: var(--jp-blue); stroke-width: 2; }
+    .proto-node-detail { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 10px; padding: 11px 14px; border: 1px solid var(--jp-line); border-radius: 9px; background: var(--jp-surface); }
+    .proto-node-detail strong { font: 500 16px var(--jp-serif); }
+    .proto-png-grid { display: grid; grid-template-columns: 1fr 340px; gap: 14px; align-items: start; }
+    .proto-png-preview { min-height: 480px; display: flex; align-items: center; justify-content: center; background-color: #fffdf7; background-image: linear-gradient(45deg,#eee7d8 25%,transparent 25%),linear-gradient(-45deg,#eee7d8 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#eee7d8 75%),linear-gradient(-45deg,transparent 75%,#eee7d8 75%); background-size: 20px 20px; background-position: 0 0,0 10px,10px -10px,-10px 0; }
+    .proto-png-preview.rice { background-color: #f4ecd8; background-image: none; }
+    .proto-png-preview.white { background-color: #fff; background-image: none; }
+    .proto-png-canvas { width: 82%; min-height: 350px; border: 1px solid var(--jp-line); background: rgba(255,253,247,.94); box-shadow: 0 6px 24px rgba(60,40,20,.12); padding: 22px; }
+    .proto-choice-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 7px 0 14px; }
+    .proto-choice-row button[aria-pressed="true"] { border-color: var(--jp-accent); color: var(--jp-accent); background: var(--jp-inset); }
+    .proto-dimension { padding: 12px; border-radius: 8px; background: var(--jp-inset); border: 1px solid var(--jp-line); margin: 12px 0; }
+    .proto-dimension strong { font: 500 20px var(--jp-serif); color: var(--jp-accent); }
+    .proto-warning { border-left: 3px solid var(--jp-gold); padding: 8px 10px; background: var(--jp-inset); color: var(--jp-muted); font-size: 12px; margin-top: 12px; }
+    .proto-duplicate-grid { display: grid; grid-template-columns: 286px 1fr; gap: 14px; align-items: start; }
+    .proto-group-list { display: flex; flex-direction: column; gap: 8px; }
+    .proto-group { text-align: left; width: 100%; display: flex; flex-direction: column; gap: 4px; background: var(--jp-surface); }
+    .proto-group[aria-pressed="true"] { border-color: var(--jp-accent); box-shadow: inset 2px 0 0 var(--jp-accent); }
+    .proto-group b { font: 500 14px var(--jp-serif); }
+    .proto-group span { color: var(--jp-muted); font-size: 11.5px; }
+    .proto-compare-head { display: grid; grid-template-columns: 1fr 44px 1fr; gap: 10px; align-items: center; }
+    .proto-person-card { border: 1px solid var(--jp-line); border-radius: 9px; padding: 13px; background: var(--jp-paper); }
+    .proto-person-card h3 { font: 500 19px var(--jp-serif); margin-bottom: 5px; }
+    .proto-person-card p { color: var(--jp-muted); font-size: 12px; line-height: 1.8; }
+    .proto-vs { text-align: center; color: var(--jp-gold); font: 500 18px var(--jp-serif); }
+    .proto-choice-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12px; }
+    .proto-choice-table th, .proto-choice-table td { border-bottom: 1px solid var(--jp-line); padding: 8px; text-align: left; vertical-align: top; }
+    .proto-choice-table th { color: var(--jp-muted); font-weight: 500; background: var(--jp-inset); }
+    .proto-choice-table td:nth-child(2), .proto-choice-table td:nth-child(3) { width: 36%; }
+    .proto-choice-table input { accent-color: var(--jp-accent); }
+    .proto-choice-table tr.selected-left td:nth-child(2), .proto-choice-table tr.selected-right td:nth-child(3) { background: var(--jp-paper); }
+    .proto-merge-summary { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+    .proto-merge-summary span { font-size: 11.5px; color: var(--jp-muted); background: var(--jp-inset); border: 1px solid var(--jp-line); border-radius: 999px; padding: 3px 9px; }
+    .proto-step-content { display: none; }
+    .proto-step-content.active { display: block; }
+    .proto-mini-stats { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin: 12px 0; }
+    .proto-mini-stats div { padding: 9px; text-align: center; border: 1px solid var(--jp-line); border-radius: 8px; background: var(--jp-inset); }
+    .proto-mini-stats strong { display: block; font: 500 18px var(--jp-serif); color: var(--jp-accent); }
+    .proto-mini-stats span { font-size: 10.5px; color: var(--jp-muted); }
+    .proto-modal { position: fixed; inset: 0; z-index: 50; background: rgba(37,29,20,.42); display: flex; align-items: center; justify-content: center; padding: 24px; }
+    .proto-modal[hidden] { display: none; }
+    .proto-dialog { width: min(620px, 100%); max-height: calc(100vh - 48px); overflow-y: auto; background: var(--jp-surface); border: 1px solid var(--jp-line); border-radius: 12px; box-shadow: 0 18px 60px rgba(30,20,10,.3); padding: 20px; }
+    .proto-dialog.wide { width: min(760px, 100%); }
+    .proto-dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+    .proto-dialog-head h3 { font: 500 19px var(--jp-serif); }
+    .proto-dialog .jp-form-row { margin-bottom: 12px; }
+    .proto-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; flex-wrap: wrap; }
+    .proto-check-box { display: flex; flex-direction: column; gap: 8px; padding: 11px; border: 1px solid var(--jp-line); border-radius: 8px; background: var(--jp-paper); }
+    .proto-check-box label { display: flex; align-items: center; gap: 8px; }
+    .proto-toast { position: fixed; right: 22px; bottom: 22px; z-index: 80; max-width: 380px; background: var(--jp-ink); color: var(--jp-bg); border-radius: 8px; padding: 11px 15px; box-shadow: 0 6px 24px rgba(0,0,0,.2); font-size: 12.5px; opacity: 0; transform: translateY(8px); pointer-events: none; transition: .18s ease; }
+    .proto-toast.show { opacity: 1; transform: none; }
+    .proto-screen-footer { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 14px; color: var(--jp-muted); font-size: 11.5px; }
+    @media (max-width: 1100px) {
+      .proto-layout-grid { grid-template-columns: repeat(3, 1fr); }
+      .proto-summary { grid-template-columns: 1fr; }
+      .proto-pdf-grid, .proto-png-grid { grid-template-columns: 300px 1fr; }
+      .proto-feature-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="jp-window">
+  <header class="jp-titlebar">
+    <button class="jp-link" data-screen-link="overview">P1 原型首页</button>
+    <span class="jp-title">张家家谱 · 百忍堂</span>
+    <span class="jp-badge jp-badge-blue">32 人 · 8 世</span>
+    <span class="jp-spacer"></span>
+    <span class="proto-version">交互原型 v0.1</span>
+    <label class="jp-muted">皮肤 <select aria-label="原型皮肤"><option>古典中国风</option></select></label>
+  </header>
+  <div class="jp-body">
+    <nav class="jp-sidebar" aria-label="P1 原型导航">
+      <button class="jp-navbtn" data-screen-link="overview"><span>◈</span><span class="jp-navtext">原型总览</span></button>
+      <button class="jp-navbtn" data-screen-link="branch"><span>⑂</span><span class="jp-navtext">支系管理</span></button>
+      <button class="jp-navbtn" data-screen-link="pdf-bio"><span>传</span><span class="jp-navtext">人物传记 PDF</span></button>
+      <button class="jp-navbtn" data-screen-link="pdf-list"><span>表</span><span class="jp-navtext">名录简表 PDF</span></button>
+      <button class="jp-navbtn" data-screen-link="graph"><span>⌘</span><span class="jp-navtext">关系图谱</span></button>
+      <button class="jp-navbtn" data-screen-link="png"><span>图</span><span class="jp-navtext">PNG 导出</span></button>
+      <button class="jp-navbtn" data-screen-link="duplicates"><span>双</span><span class="jp-navtext">成员查重</span></button>
+      <button class="jp-navbtn" data-screen-link="excel"><span>导</span><span class="jp-navtext">Excel 导入</span></button>
+      <div class="jp-nav-foot">张氏 · 百忍堂<br>P1 设计确认稿<br>示例数据，不落库</div>
+    </nav>
+
+    <main class="jp-main proto-main">
+      <div class="proto-note">
+        <span class="proto-note-seal">稿</span>
+        <span><b>P1 高保真交互原型：</b>用于确认页面布局、操作路径和风险提示；所有按钮仅演示，不会修改真实家谱数据。</span>
+      </div>
+
+      <section class="proto-screen active" data-screen="overview">
+        <div class="jp-page-head">
+          <h2 class="jp-page-title jp-serif-c">P1 增强功能原型</h2>
+          <span class="jp-muted">7 项增强 · 8 个页面 · 覆盖完整操作路径</span>
+          <div class="proto-head-actions"><button class="jp-primary" data-screen-link="branch">从支系管理开始</button></div>
+        </div>
+        <div class="proto-feature-grid">
+          <article class="proto-feature">
+            <span class="proto-feature-no">01</span><h3>支系合并、拆分与迁移</h3>
+            <p>在支系树旁直接发起结构调整，操作前展示成员、子支系、关系与开基祖影响。</p>
+            <div class="proto-flow"><span>选择范围</span><span>影响预览</span><span>二次确认</span><span>可撤销</span></div>
+            <div class="jp-detail-actions"><button data-screen-link="branch">查看支系原型</button></div>
+          </article>
+          <article class="proto-feature">
+            <span class="proto-feature-no">02</span><h3>PDF 人物传记式</h3>
+            <p>每位成员独立成篇，照片、基本信息、亲属、支系与生平统一排版，长传记自动分页。</p>
+            <div class="proto-flow"><span>成员范围</span><span>传记预览</span><span>跨页检查</span><span>导出 PDF</span></div>
+            <div class="jp-detail-actions"><button data-screen-link="pdf-bio">查看传记原型</button></div>
+          </article>
+          <article class="proto-feature">
+            <span class="proto-feature-no">03</span><h3>PDF 名录简表式</h3>
+            <p>按世代、行第、姓名或支系排序，字段可选，自动分页并重复表头，成员行不跨页。</p>
+            <div class="proto-flow"><span>字段选择</span><span>排序规则</span><span>表格预览</span><span>导出 PDF</span></div>
+            <div class="jp-detail-actions"><button data-screen-link="pdf-list">查看名录原型</button></div>
+          </article>
+          <article class="proto-feature">
+            <span class="proto-feature-no">04</span><h3>关系图谱横向树</h3>
+            <p>纵向 / 横向即时切换，保留搜索、缩放、折叠、祖先与后代视图，不丢失选中状态。</p>
+            <div class="proto-flow"><span>布局切换</span><span>节点交互</span><span>状态保持</span><span>偏好记忆</span></div>
+            <div class="jp-detail-actions"><button data-screen-link="graph">查看图谱原型</button></div>
+          </article>
+          <article class="proto-feature">
+            <span class="proto-feature-no">05</span><h3>图谱导出 PNG</h3>
+            <p>导出当前视口或已展开可见子图，支持 1× / 2× / 4×、三种背景与图例标题选项。</p>
+            <div class="proto-flow"><span>导出范围</span><span>清晰度</span><span>尺寸预警</span><span>保存图片</span></div>
+            <div class="jp-detail-actions"><button data-screen-link="png">查看 PNG 原型</button></div>
+          </article>
+          <article class="proto-feature">
+            <span class="proto-feature-no">06</span><h3>成员查重与合并</h3>
+            <p>按姓名、生卒、父母与配偶生成疑似重复组，并排逐字段选择，人工确认后事务合并。</p>
+            <div class="proto-flow"><span>疑似列表</span><span>并排对比</span><span>字段取舍</span><span>影响确认</span></div>
+            <div class="jp-detail-actions"><button data-screen-link="duplicates">查看查重原型</button></div>
+          </article>
+          <article class="proto-feature">
+            <span class="proto-feature-no">07</span><h3>Excel 成员导入</h3>
+            <p>模板、字段映射、预检、重复处理、预览、事务导入、问题报告与整批撤销的完整向导。</p>
+            <div class="proto-flow"><span>选择文件</span><span>字段映射</span><span>校验预览</span><span>导入完成</span></div>
+            <div class="jp-detail-actions"><button data-screen-link="excel">查看导入原型</button></div>
+          </article>
+          <article class="proto-feature">
+            <span class="proto-feature-no">✓</span><h3>统一交互约定</h3>
+            <p>破坏性操作均二次确认；执行后提示撤销；错误行不落库；所有列表保留空状态与加载反馈。</p>
+            <div class="proto-flow"><span>二次确认</span><span>事务执行</span><span>失败回滚</span><span>操作可撤销</span></div>
+            <div class="jp-detail-actions"><button data-screen-link="duplicates">查看确认弹窗</button></div>
+          </article>
+        </div>
+        <div class="proto-summary">
+          <div class="jp-panel"><div class="jp-panel-title">建议确认顺序</div><ul class="proto-check-list"><li>先确认支系调整与查重合并的影响预览。</li><li>再确认两种 PDF 排版与图谱横向布局。</li><li>最后确认 PNG 导出限制和 Excel 错误修正路径。</li></ul></div>
+          <div class="jp-panel"><div class="jp-panel-title">视觉方向</div><p class="jp-muted">沿用现有古典中国风：宣纸底色、赭石强调、墨色正文、宋体标题，保持左侧固定导航。</p></div>
+          <div class="jp-panel"><div class="jp-panel-title">原型边界</div><p class="jp-muted">本稿只确认 P1 界面与交互，不包含 P2 的 GEDCOM、自定义皮肤、环形图谱、自动更新、关系导入与 xls。</p></div>
+        </div>
+      </section>
+
+      <section class="proto-screen" data-screen="branch">
+        <div class="jp-page-head">
+          <h2 class="jp-page-title jp-serif-c">支系管理</h2>
+          <span class="jp-muted">合并 / 拆分 / 迁移 · 操作前预览影响 · 事务执行 · 支持撤销</span>
+          <div class="proto-head-actions">
+            <button data-modal-open="modal-merge">合并支系</button>
+            <button data-modal-open="modal-split">拆分支系</button>
+            <button data-modal-open="modal-migrate">迁移成员</button>
+            <button class="jp-primary">＋ 新增支系</button>
+          </div>
+        </div>
+        <div class="proto-kpis">
+          <div class="proto-kpi"><strong>6</strong><span>支系总数</span></div>
+          <div class="proto-kpi"><strong>32</strong><span>成员总数</span></div>
+          <div class="proto-kpi"><strong>18</strong><span>当前支系成员</span></div>
+          <div class="proto-kpi"><strong>3</strong><span>下级支系</span></div>
+        </div>
+        <div class="proto-branch-grid">
+          <div class="jp-panel">
+            <div class="jp-panel-title">支系树</div>
+            <div class="proto-tree">
+              <button class="proto-tree-row" aria-pressed="true"><span class="jp-serif-c">长房</span><small>18 人</small></button>
+              <button class="proto-tree-row" style="margin-left:16px"><span class="jp-serif-c">长房长支</span><small>9 人</small></button>
+              <button class="proto-tree-row" style="margin-left:32px"><span class="jp-serif-c">长房长支东份</span><small>4 人</small></button>
+              <button class="proto-tree-row" style="margin-left:16px"><span class="jp-serif-c">长房次支</span><small>6 人</small></button>
+              <button class="proto-tree-row" style="margin-left:16px"><span class="jp-serif-c">长房三支</span><small>3 人</small></button>
+              <button class="proto-tree-row"><span class="jp-serif-c">二房</span><small>10 人</small></button>
+              <button class="proto-tree-row" style="margin-left:16px"><span class="jp-serif-c">二房长支</span><small>5 人</small></button>
+              <button class="proto-tree-row"><span class="jp-serif-c">三房</span><small>4 人</small></button>
+            </div>
+            <div class="proto-warning">同名支系会提示但允许保留；禁止把支系合并到自己的后代支系。</div>
+          </div>
+          <div class="jp-panel">
+            <div class="jp-panel-title">支系详情 · 长房</div>
+            <div class="jp-detail-tags"><span class="jp-badge jp-badge-blue">18 人</span><span class="jp-badge jp-badge-gold">开基祖 · 张正仁</span><span class="jp-badge">3 个下级支系</span></div>
+            <div class="jp-form-row">
+              <label class="jp-field"><span>支系名称</span><input value="长房" aria-label="支系名称"></label>
+              <label class="jp-field"><span>上级支系</span><select aria-label="上级支系"><option>无（顶级支系）</option></select></label>
+            </div>
+            <div class="jp-form-row">
+              <label class="jp-field"><span>开基祖</span><input value="张正仁 · 二世 · 长房" aria-label="开基祖"></label>
+              <label class="jp-field"><span>排序</span><input value="1" aria-label="支系排序"></label>
+            </div>
+            <label class="jp-field"><span>简介</span><textarea rows="2" aria-label="支系简介">始祖长子所开，后世分为长、次、三支，主要居本地。</textarea></label>
+            <div class="proto-impact">
+              <div><strong>18</strong><span>直接成员</span></div><div><strong>3</strong><span>子支系</span></div><div><strong>26</strong><span>关系记录</span></div><div><strong>1</strong><span>字辈继承</span></div>
+            </div>
+            <div class="jp-panel-title">成员归属预览</div>
+            <div class="jp-table-wrap">
+              <table class="jp-table">
+                <thead><tr><th>姓名</th><th>世代</th><th>当前支系</th><th>操作</th></tr></thead>
+                <tbody>
+                  <tr><td>张正仁</td><td>二世</td><td>长房</td><td><button data-modal-open="modal-migrate">迁移</button></td></tr>
+                  <tr><td>张正忠</td><td>二世</td><td>长房</td><td><button data-modal-open="modal-migrate">迁移</button></td></tr>
+                  <tr><td>张天德</td><td>三世</td><td>长房长支</td><td><button data-modal-open="modal-migrate">迁移</button></td></tr>
+                  <tr><td>张天佑</td><td>三世</td><td>长房次支</td><td><button data-modal-open="modal-migrate">迁移</button></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="jp-detail-actions"><button class="jp-primary">保存修改</button><button class="jp-danger">删除支系</button></div>
+          </div>
+        </div>
+        <div class="proto-screen-footer"><span>操作结果会在成员列表、支系统计、PDF 导出范围与图谱中同步。</span><span>失败自动回滚，成功后可撤销。</span></div>
+      </section>
+
+      <section class="proto-screen" data-screen="pdf-bio">
+        <div class="jp-page-head">
+          <h2 class="jp-page-title jp-serif-c">导出 PDF · 人物传记式</h2>
+          <span class="jp-muted">每位成员独立成篇 · 长传记自动分页 · 照片不变形</span>
+          <div class="proto-head-actions"><button data-screen-link="pdf-list">切换到名录简表</button></div>
+        </div>
+        <div class="proto-layout-grid">
+          <button class="proto-layout"><b>宝塔式吊线图</b><small>世系吊线，配偶并列</small></button>
+          <button class="proto-layout"><b>欧式横表</b><small>五世一表，世代衔接</small></button>
+          <button class="proto-layout"><b>苏式垂珠体</b><small>竖排右起，传统谱书</small></button>
+          <button class="proto-layout" aria-pressed="true"><b>人物传记式 · P1</b><small>一人一篇，图文并茂</small></button>
+          <button class="proto-layout"><b>名录简表式 · P1</b><small>一行一人，紧凑总览</small></button>
+        </div>
+        <div class="proto-pdf-grid">
+          <div class="jp-panel">
+            <div class="jp-panel-title">导出设置</div>
+            <label class="jp-field" style="margin-bottom:10px"><span>导出范围</span><select aria-label="传记导出范围"><option>整谱（32 人）</option><option>指定支系</option><option>指定世代</option><option>勾选成员（4 人）</option></select></label>
+            <div class="jp-form-row">
+              <label class="jp-field"><span>纸张</span><select aria-label="纸张"><option>A4</option></select></label>
+              <label class="jp-field"><span>方向</span><select aria-label="方向"><option>纵向</option></select></label>
+            </div>
+            <div class="jp-form-row">
+              <label class="jp-field"><span>正文字体</span><select aria-label="正文字体"><option>宋体</option></select></label>
+              <label class="jp-field"><span>字号</span><select aria-label="字号"><option>小四</option></select></label>
+            </div>
+            <div class="jp-form-row" style="gap:14px"><label><input type="checkbox" checked>封面</label><label><input type="checkbox" checked>谱名</label><label><input type="checkbox" checked>页眉页码</label></div>
+            <div class="proto-warning">标题与人物信息保持同页；照片按比例缩放并居中，不拉伸变形。</div>
+            <p class="jp-muted" style="margin-top:12px">整谱 32 人 · A4 纵向 · 预计 38 页 · 内嵌中文字体</p>
+            <div class="jp-detail-actions"><button class="jp-primary">导出 PDF</button><button>刷新预览</button></div>
+          </div>
+          <div>
+            <div class="proto-preview-bar"><span class="jp-muted">排版预览 · 人物传记</span><div class="jp-tabs"><button data-bio-page="1" class="bio-page active">第 1 页</button><button data-bio-page="2" class="bio-page">第 2 页</button><button data-bio-page="3" class="bio-page">第 3 页</button></div></div>
+            <div class="proto-preview-shell">
+              <article class="proto-paper" id="bio-page-1">
+                <div class="proto-paper-sub">张氏家谱 · 百忍堂</div>
+                <div class="proto-paper-title">张 国 栋 传</div>
+                <div class="proto-paper-rule"></div>
+                <div class="proto-person-head">
+                  <div class="proto-photo">遗像</div>
+                  <div style="flex:1"><div class="proto-person-name">张国栋</div><div class="proto-person-meta"><span>字：国用</span><span>号：耐庵</span><span>性别：男</span><span>世代：二世</span><span>生：公历 1850-03-12</span><span>卒：公历 1921-11-02</span><span>支系：长房</span><span>状态：已故</span></div></div>
+                </div>
+                <div class="proto-bio-section"><h4>世系</h4><p>父 张正仁　母 王淑贞　原配 李秀兰　子 张天德、张天佑、张天顺</p></div>
+                <div class="proto-bio-section"><h4>生平</h4><p>公幼承庭训，勤学好问。咸丰末年，乡里匪患频仍，公率族众筑圩自守，乡人赖之。中年迁居县东，开垦荒田数十亩，教子弟耕读并重。</p><p>公持家俭朴，待人和厚，凡族中贫乏者，常量力周济。晚年主持修辑支谱，考订世系，手录先人手泽数卷，至今尚有存者。</p></div>
+                <div class="proto-page-foot"><span>张氏家谱 · 人物传记</span><span>第 1 页</span></div>
+              </article>
+              <article class="proto-paper" id="bio-page-2" hidden>
+                <div class="proto-paper-sub">张氏家谱 · 百忍堂</div>
+                <div class="proto-paper-title">张 国 栋 传 · 续</div>
+                <div class="proto-paper-rule"></div>
+                <div class="proto-bio-section"><h4>生平 · 续</h4><p>民国初年，公倡议设立族中义学，捐资修缮祠堂，并制定条规，劝勉族中子弟勿事奢靡。每届春秋祭祖，公必亲自主持，行礼如仪，数十年未尝懈怠。</p><p>公生三子，长天德承长房长支，次天佑承长房次支，三天顺早夭。诸孙成年后，多从事教育、农商，各能自立。公常训之曰：“守身莫先于孝友，立身莫先于勤俭。”</p><p>公元一九二一年农历十月初三，公无疾而终，享年七十有二。葬于祖茔东侧，墓碑由族中名手书丹，铭其行实。</p></div>
+                <div class="proto-bio-section"><h4>居地与葬地</h4><p>居地：本县东乡张家圩　葬地：张家圩祖茔东侧</p><p>备注：生年据祠堂神主牌与旧谱互证；卒日据丧簿记载。</p></div>
+                <div class="proto-page-foot"><span>张氏家谱 · 人物传记</span><span>第 2 页</span></div>
+              </article>
+              <article class="proto-paper" id="bio-page-3" hidden>
+                <div class="proto-paper-sub">张氏家谱 · 百忍堂</div>
+                <div class="proto-paper-title">张 天 德 传</div>
+                <div class="proto-paper-rule"></div>
+                <div class="proto-person-head"><div class="proto-photo">遗像</div><div style="flex:1"><div class="proto-person-name">张天德</div><div class="proto-person-meta"><span>字：立德</span><span>性别：男</span><span>世代：三世</span><span>生：公历 1899-04-18</span><span>卒：公历 1972-08-06</span><span>支系：长房长支</span><span>状态：已故</span></div></div></div>
+                <div class="proto-bio-section"><h4>生平</h4><p>天德公少读私塾，后习算术，曾在县内商号司账。为人谨慎，账目分明，深得东主信任。成家后兼顾农事，教导子女读书识字。</p><p>晚年将父辈手泽与家族旧谱妥为收藏，交予长子保管，并嘱咐后人毋忘耕读之家风。</p></div>
+                <div class="proto-page-foot"><span>张氏家谱 · 人物传记</span><span>第 3 页</span></div>
+              </article>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="proto-screen" data-screen="pdf-list">
+        <div class="jp-page-head">
+          <h2 class="jp-page-title jp-serif-c">导出 PDF · 名录简表式</h2>
+          <span class="jp-muted">一行一人 · 字段可选 · 自动分页 · 重复表头</span>
+          <div class="proto-head-actions"><button data-screen-link="pdf-bio">切换到人物传记</button></div>
+        </div>
+        <div class="proto-layout-grid">
+          <button class="proto-layout"><b>宝塔式吊线图</b><small>世系吊线，配偶并列</small></button>
+          <button class="proto-layout"><b>欧式横表</b><small>五世一表，世代衔接</small></button>
+          <button class="proto-layout"><b>苏式垂珠体</b><small>竖排右起，传统谱书</small></button>
+          <button class="proto-layout"><b>人物传记式</b><small>一人一篇，图文并茂</small></button>
+          <button class="proto-layout" aria-pressed="true"><b>名录简表式 · P1</b><small>一行一人，紧凑总览</small></button>
+        </div>
+        <div class="proto-pdf-grid">
+          <div class="jp-panel">
+            <div class="jp-panel-title">名录设置</div>
+            <label class="jp-field" style="margin-bottom:10px"><span>导出范围</span><select aria-label="名录导出范围"><option>整谱（32 人）</option><option>指定支系</option><option>世代区间</option><option>勾选成员</option></select></label>
+            <label class="jp-field" style="margin-bottom:10px"><span>排序方式</span><select aria-label="名录排序"><option>世代 → 行第 → 姓名</option><option>姓名</option><option>支系</option></select></label>
+            <div class="jp-panel-title" style="margin-top:14px">显示字段</div>
+            <div class="proto-field-grid">
+              <label><input type="checkbox" checked>姓名</label><label><input type="checkbox" checked>性别</label>
+              <label><input type="checkbox" checked>世代</label><label><input type="checkbox" checked>字辈</label>
+              <label><input type="checkbox" checked>支系</label><label><input type="checkbox" checked>生卒</label>
+              <label><input type="checkbox" checked>父母</label><label><input type="checkbox" checked>配偶</label>
+              <label><input type="checkbox" checked>居地</label><label><input type="checkbox">葬地</label>
+            </div>
+            <label><input type="checkbox" checked>过长文本省略</label>
+            <div class="proto-warning">同一成员行不跨页；空值统一显示“—”；每页自动重复表头。</div>
+            <p class="jp-muted" style="margin-top:12px">整谱 32 人 · A4 横向 · 预计 3 页 · 当前每页 14 行</p>
+            <div class="jp-detail-actions"><button class="jp-primary">导出 PDF</button><button>刷新预览</button></div>
+          </div>
+          <div>
+            <div class="proto-preview-bar"><span class="jp-muted">排版预览 · 名录简表</span><div class="jp-tabs"><button class="active">第 1 页</button><button>第 2 页</button><button>第 3 页</button></div></div>
+            <div class="proto-preview-shell">
+              <article class="proto-paper landscape">
+                <div class="proto-paper-sub">张氏家谱 · 百忍堂</div>
+                <div class="proto-paper-title" style="font-size:22px">张 氏 成 员 名 录</div>
+                <table class="proto-table-paper">
+                  <thead><tr><th>姓名</th><th>性别</th><th>世代</th><th>字辈</th><th>支系</th><th>生卒</th><th>父母</th><th>配偶</th><th>居地</th></tr></thead>
+                  <tbody>
+                    <tr><td>张正仁</td><td>男</td><td>二世</td><td>正</td><td>长房</td><td>1874–1946</td><td>张国栋 / 李秀兰</td><td>王淑贞</td><td>张家圩</td></tr>
+                    <tr><td>张正忠</td><td>男</td><td>二世</td><td>正</td><td>长房</td><td>1877–1952</td><td>张国栋 / 李秀兰</td><td>赵春娥</td><td>张家圩</td></tr>
+                    <tr><td>张天德</td><td>男</td><td>三世</td><td>天</td><td>长房长支</td><td>1899–1972</td><td>张正仁 / 王淑贞</td><td>刘慧敏</td><td>县东乡</td></tr>
+                    <tr><td>张天佑</td><td>男</td><td>三世</td><td>天</td><td>长房次支</td><td>1902–1977</td><td>张正忠 / 赵春娥</td><td>周桂英</td><td>县西乡</td></tr>
+                    <tr><td>张天顺</td><td>男</td><td>三世</td><td>天</td><td>长房三支</td><td>1905–1983</td><td>张正仁 / 王淑贞</td><td>孙玉珍</td><td>张家圩</td></tr>
+                    <tr><td>张心远</td><td>男</td><td>四世</td><td>心</td><td>长房长支</td><td>1924–2003</td><td>张天德 / 刘慧敏</td><td>王雅琴</td><td>县东乡</td></tr>
+                    <tr><td>张心明</td><td>男</td><td>四世</td><td>心</td><td>长房长支</td><td>1927–2010</td><td>张天德 / 刘慧敏</td><td>吴秀英</td><td>县东乡</td></tr>
+                    <tr><td>张心兰</td><td>女</td><td>四世</td><td>心</td><td>长房次支</td><td>1930–2018</td><td>张天佑 / 周桂英</td><td>陈玉梅</td><td>县西乡</td></tr>
+                    <tr><td>张心诚</td><td>男</td><td>四世</td><td>心</td><td>长房三支</td><td>1932–2015</td><td>张天顺 / 孙玉珍</td><td>郑淑华</td><td>张家圩</td></tr>
+                    <tr><td>张顺达</td><td>男</td><td>五世</td><td>顺</td><td>长房长支</td><td>1954–</td><td>张心远 / 王雅琴</td><td>—</td><td>本市</td></tr>
+                    <tr><td>张顺平</td><td>男</td><td>五世</td><td>顺</td><td>长房次支</td><td>1953–</td><td>张心明 / 吴秀英</td><td>林静</td><td>本市</td></tr>
+                    <tr><td>张顺昌</td><td>男</td><td>五世</td><td>顺</td><td>长房三支</td><td>1958–</td><td>张心诚 / 郑淑华</td><td>—</td><td>外省</td></tr>
+                  </tbody>
+                </table>
+                <div class="proto-page-foot"><span>张氏家谱 · 成员名录</span><span>第 1 页 / 共 3 页</span></div>
+              </article>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="proto-screen" data-screen="graph">
+        <div class="jp-page-head">
+          <h2 class="jp-page-title jp-serif-c">关系图谱</h2>
+          <span class="jp-muted">横向树 / 纵向树即时切换 · 保留选中与折叠状态</span>
+          <div class="proto-head-actions"><button class="jp-primary" data-modal-open="modal-png">导出 PNG</button></div>
+        </div>
+        <div class="proto-graph-tools">
+          <div class="jp-tabs" style="margin:0"><button class="active">全谱</button><button>祖先视图</button><button>后代视图</button></div>
+          <span style="flex:1"></span>
+          <span class="jp-muted">布局</span>
+          <div class="proto-segmented"><button data-orientation="vertical">纵向树</button><button data-orientation="horizontal" aria-pressed="true">横向树</button></div>
+          <input type="search" placeholder="输入姓名定位" aria-label="图谱搜索定位" style="width:150px">
+          <button>定位</button><button>－</button><button>＋</button><button>适应</button>
+        </div>
+        <div class="proto-graph-stage"><svg id="proto-graph-svg" viewBox="0 0 1000 480" role="img" aria-label="横向世系图谱"></svg></div>
+        <div class="jp-legend"><span><i></i>血缘世系</span><span><i class="jp-lg-dash"></i>过继 / 兼祧</span><span><i class="jp-lg-marry"></i>配偶</span><span><i class="jp-lg-female"></i>女性成员</span><span class="jp-muted">共 13 节点 · 横向树 · 已展开</span></div>
+        <div class="proto-node-detail"><strong>张心兰</strong><span class="jp-badge jp-badge-blue">女</span><span class="jp-badge jp-badge-accent">四世</span><span class="jp-muted">1930–2018 · 长房次支</span><span class="jp-muted">父母：张天佑 / 周桂英</span><span style="flex:1"></span><button>编辑</button><button>后代视图</button></div>
+        <div class="proto-screen-footer"><span>切换布局不会清空搜索、选中节点和折叠状态；布局偏好按家谱记忆。</span><span>2000 人时仅渲染可见区域，超大全谱建议先折叠或选择支系。</span></div>
+      </section>
+
+      <section class="proto-screen" data-screen="png">
+        <div class="jp-page-head">
+          <h2 class="jp-page-title jp-serif-c">关系图谱 · 导出 PNG</h2>
+          <span class="jp-muted">当前视口 / 可见子图 · 1× / 2× / 4× · 背景与图例可选</span>
+          <div class="proto-head-actions"><button data-screen-link="graph">返回关系图谱</button></div>
+        </div>
+        <div class="proto-png-grid">
+          <div class="jp-panel">
+            <div class="proto-preview-bar"><span class="jp-panel-title" style="margin:0">导出预览</span><span class="jp-muted" id="png-size-label">1960 × 1120 px</span></div>
+            <div class="proto-png-preview" id="png-preview">
+              <div class="proto-png-canvas">
+                <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--jp-line);padding-bottom:10px;margin-bottom:18px"><strong class="jp-serif-c" style="font-size:17px">张氏家谱 · 横向世系图</strong><span class="jp-muted">百忍堂</span></div>
+                <svg viewBox="0 0 560 210" style="width:100%;height:210px">
+                  <path d="M80 70 H150 M230 70 H300 M380 70 H450" class="proto-edge"></path>
+                  <path d="M150 70 V150 H230 M300 70 V150 H380" class="proto-edge"></path>
+                  <path d="M230 150 V190 M380 150 V190" class="proto-edge"></path>
+                  <g class="proto-gnode"><rect x="20" y="48" width="110" height="44" rx="4"></rect><text x="75" y="68" text-anchor="middle">张国栋</text><text class="sub" x="75" y="83" text-anchor="middle">1850–1921</text></g>
+                  <g class="proto-gnode female spouse"><rect x="150" y="48" width="110" height="44" rx="4"></rect><text x="205" y="68" text-anchor="middle">李秀兰</text><text class="sub" x="205" y="83" text-anchor="middle">1853–1930</text></g>
+                  <g class="proto-gnode"><rect x="300" y="48" width="110" height="44" rx="4"></rect><text x="355" y="68" text-anchor="middle">张正仁</text><text class="sub" x="355" y="83" text-anchor="middle">1874–1946</text></g>
+                  <g class="proto-gnode female spouse"><rect x="430" y="48" width="110" height="44" rx="4"></rect><text x="485" y="68" text-anchor="middle">王淑贞</text><text class="sub" x="485" y="83" text-anchor="middle">1876–1950</text></g>
+                  <g class="proto-gnode"><rect x="60" y="128" width="110" height="44" rx="4"></rect><text x="115" y="148" text-anchor="middle">张天德</text><text class="sub" x="115" y="163" text-anchor="middle">1899–1972</text></g>
+                  <g class="proto-gnode"><rect x="210" y="128" width="110" height="44" rx="4"></rect><text x="265" y="148" text-anchor="middle">张天佑</text><text class="sub" x="265" y="163" text-anchor="middle">1902–1977</text></g>
+                  <g class="proto-gnode"><rect x="360" y="128" width="110" height="44" rx="4"></rect><text x="415" y="148" text-anchor="middle">张天顺</text><text class="sub" x="415" y="163" text-anchor="middle">1905–1983</text></g>
+                </svg>
+                <div class="jp-legend" style="margin-top:14px"><span><i></i>血缘</span><span><i class="jp-lg-dash"></i>特殊关系</span><span><i class="jp-lg-marry"></i>配偶</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="jp-panel">
+            <div class="jp-panel-title">导出设置</div>
+            <label class="jp-field" style="margin-bottom:12px"><span>导出范围</span><select aria-label="PNG 导出范围"><option>当前已展开的可见子图</option><option>当前视口</option></select></label>
+            <div class="jp-panel-title">清晰度</div>
+            <div class="proto-choice-row"><button data-scale="1" aria-pressed="true">1× 标准</button><button data-scale="2">2× 高清</button><button data-scale="4">4× 超清</button></div>
+            <div class="jp-panel-title">背景</div>
+            <div class="proto-choice-row"><button data-bg="white" aria-pressed="true">白色</button><button data-bg="rice">宣纸色</button><button data-bg="transparent">透明</button></div>
+            <div class="jp-form-row" style="gap:14px"><label><input type="checkbox" checked>图例</label><label><input type="checkbox" checked>谱名</label><label><input type="checkbox">导出时间</label></div>
+            <div class="proto-dimension"><span class="jp-muted">预计图片尺寸</span><br><strong id="png-dimensions">1960 × 1120 px</strong><br><span class="jp-muted">约 1.8 MB · PNG</span></div>
+            <div class="proto-warning">超过图片引擎限制时会提示并建议改用 PDF；超大全谱不会强制一次性导出。</div>
+            <div class="jp-detail-actions"><button class="jp-primary" data-prototype-action="png-exported">导出 PNG</button><button>恢复默认</button></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="proto-screen" data-screen="duplicates">
+        <div class="jp-page-head">
+          <h2 class="jp-page-title jp-serif-c">成员查重与合并</h2>
+          <span class="jp-muted">仅生成疑似重复列表 · 逐字段人工选择 · 禁止自动合并</span>
+          <div class="proto-head-actions"><button class="jp-primary">重新扫描</button><button data-screen-link="overview">返回总览</button></div>
+        </div>
+        <div class="proto-kpis">
+          <div class="proto-kpi"><strong>6</strong><span>疑似重复组</span></div><div class="proto-kpi"><strong>12</strong><span>涉及成员</span></div><div class="proto-kpi"><strong>4</strong><span>高相似度</span></div><div class="proto-kpi"><strong>2</strong><span>待人工判断</span></div>
+        </div>
+        <div class="proto-duplicate-grid">
+          <div class="jp-panel">
+            <div class="jp-panel-title">疑似重复列表</div>
+            <div class="proto-group-list">
+              <button class="proto-group" aria-pressed="true"><b>张心兰 / 张心兰</b><span>同姓名 · 同生年 · 同父母 · 高相似</span></button>
+              <button class="proto-group"><b>张顺平 / 张顺萍</b><span>姓名相近 · 同支系 · 同生年</span></button>
+              <button class="proto-group"><b>张国栋 / 张国南</b><span>姓名相近 · 字辈相同 · 待判断</span></button>
+              <button class="proto-group"><b>王淑贞 / 王淑珍</b><span>姓名相近 · 同配偶 · 待判断</span></button>
+              <button class="proto-group"><b>张天佑 / 张天祐</b><span>异体字 · 生卒一致 · 高相似</span></button>
+              <button class="proto-group"><b>刘慧敏 / 刘惠敏</b><span>姓名相近 · 同子女 · 高相似</span></button>
+            </div>
+            <div class="proto-warning">仅姓名相同不会直接判重；系统不会自动合并任何成员。</div>
+          </div>
+          <div class="jp-panel">
+            <div class="proto-panel-title jp-panel-title">并排对比 · 第 1 组</div>
+            <div class="proto-compare-head">
+              <div class="proto-person-card"><h3>张心兰 <span class="jp-badge jp-badge-blue">女</span></h3><p>1930–2018 · 四世 · 长房次支<br>父母：张天佑 / 周桂英<br>配偶：陈玉梅　子女：2 人<br>照片：有　备注：1 条　关系：7 条</p></div>
+              <div class="proto-vs">或</div>
+              <div class="proto-person-card"><h3>张心兰 <span class="jp-badge jp-badge-blue">女</span></h3><p>1930-05-12–2018 · 四世 · 长房<br>父母：张天佑 / 周桂英<br>配偶：陈玉梅　子女：2 人<br>照片：无　备注：2 条　关系：6 条</p></div>
+            </div>
+            <table class="proto-choice-table">
+              <thead><tr><th>字段</th><th>保留左侧</th><th>保留右侧</th><th>合并策略</th></tr></thead>
+              <tbody>
+                <tr class="selected-left"><td>姓名</td><td><label><input type="radio" name="f-name" checked>张心兰</label></td><td><label><input type="radio" name="f-name">张心兰</label></td><td>相同</td></tr>
+                <tr class="selected-right"><td>出生日期</td><td><label><input type="radio" name="f-birth">1930</label></td><td><label><input type="radio" name="f-birth" checked>1930-05-12</label></td><td>采用更完整值</td></tr>
+                <tr class="selected-left"><td>支系</td><td><label><input type="radio" name="f-branch" checked>长房次支</label></td><td><label><input type="radio" name="f-branch">长房</label></td><td>保留当前归属</td></tr>
+                <tr class="selected-left"><td>照片</td><td><label><input type="radio" name="f-photo" checked>保留</label></td><td><label><input type="radio" name="f-photo">无</label></td><td>非空优先</td></tr>
+                <tr class="selected-right"><td>备注</td><td><label><input type="radio" name="f-remark">待考证</label></td><td><label><input type="radio" name="f-remark" checked>生年据旧谱；卒日待考</label></td><td>合并去重</td></tr>
+                <tr><td>关系</td><td colspan="2">父母、配偶、子女与特殊关系将合并去重</td><td>自动去重</td></tr>
+              </tbody>
+            </table>
+            <div class="proto-merge-summary"><span>保留 1 位成员</span><span>合并 7 条关系</span><span>照片 1 张</span><span>备注 2 条</span><span>支系归属 1 项</span></div>
+            <div class="proto-warning">合并后保留左侧 ID，右侧成员软删除；关系不会成为孤儿，操作支持撤销。</div>
+            <div class="jp-detail-actions"><button data-modal-open="modal-member-merge" class="jp-primary">预览影响并合并</button><button>暂不处理</button><button>标记为不同成员</button></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="proto-screen" data-screen="excel">
+        <div class="jp-page-head">
+          <h2 class="jp-page-title jp-serif-c">成员录入 · Excel 导入</h2>
+          <span class="jp-muted">模板 → 映射 → 预检 → 预览 → 导入 → 报告 / 撤销</span>
+          <div class="proto-head-actions"><button>下载 Excel 模板</button><button class="jp-primary">选择 .xlsx 文件</button></div>
+        </div>
+        <div class="jp-excel-steps">
+          <button class="done excel-step" data-excel-step="file"><b>✓</b>选择文件</button>
+          <button class="done excel-step" data-excel-step="mapping"><b>✓</b>字段映射</button>
+          <button class="active excel-step" data-excel-step="preview"><b>3</b>校验预览</button>
+          <button class="excel-step" data-excel-step="done"><b>4</b>导入完成</button>
+        </div>
+        <div class="jp-panel jp-excel-file"><div><strong>张氏成员补充表.xlsx</strong><div class="jp-muted">已选择文件，导入前会再次核对文件内容，防止文件被替换。</div></div><button>重新选择</button></div>
+
+        <div class="proto-step-content" data-excel-content="file">
+          <div class="jp-panel jp-excel-intro"><div class="jp-excel-mark">表</div><h3>从 Excel 批量录入成员</h3><p class="jp-muted">先下载标准模板，填写成员基本信息后上传。首期支持 .xlsx，不自动导入亲属关系与照片。</p><div class="jp-detail-actions"><button class="jp-primary">下载 Excel 模板</button><button>选择 .xlsx 文件</button></div></div>
+        </div>
+        <div class="proto-step-content" data-excel-content="mapping">
+          <div class="jp-panel">
+            <div class="jp-panel-title">字段映射与导入规则</div>
+            <div class="jp-table-wrap"><table class="jp-table proto-choice-table"><thead><tr><th>软件字段</th><th>Excel 列</th><th>说明</th></tr></thead><tbody>
+              <tr><td>姓名 <span class="jp-badge jp-badge-accent">必填</span></td><td><select><option>姓名</option></select></td><td>自动识别：名字 / 成员姓名</td></tr>
+              <tr><td>性别</td><td><select><option>性别</option></select></td><td>男 / 女 / 未知</td></tr>
+              <tr><td>世代</td><td><select><option>世代</option></select></td><td>留空使用默认世代</td></tr>
+              <tr><td>支系</td><td><select><option>支系</option></select></td><td>按名称匹配</td></tr>
+              <tr><td>出生日期</td><td><select><option>出生日期</option></select></td><td>支持公历 / 农历</td></tr>
+              <tr><td>备注</td><td><select><option>备注</option></select></td><td>导入后内联展示</td></tr>
+            </tbody></table></div>
+            <div class="jp-form-row" style="margin-top:14px"><label class="jp-field"><span>重复成员</span><select><option>逐行确认</option></select></label><label class="jp-field"><span>不存在的支系</span><select><option>标记错误</option></select></label><label class="jp-field"><span>默认世代</span><input value="9" type="number"></label></div>
+            <div class="jp-detail-actions"><button class="jp-primary" data-excel-step="preview">重新校验并预览</button><button data-excel-step="file">取消</button></div>
+          </div>
+        </div>
+        <div class="proto-step-content active" data-excel-content="preview">
+          <div class="jp-panel">
+            <div class="jp-panel-title">校验结果与导入预览</div>
+            <div class="proto-mini-stats"><div><strong>100</strong><span>总行数</span></div><div><strong>96</strong><span>可导入</span></div><div><strong>2</strong><span>跳过</span></div><div><strong>2</strong><span>失败</span></div><div><strong>3</strong><span>错误</span></div><div><strong>12</strong><span>警告</span></div></div>
+            <div class="jp-confirm" style="padding:10px 12px;border:1px solid var(--jp-gold);border-radius:8px;background:var(--jp-inset);display:flex;gap:12px;align-items:center"><span>96 行未填写世代，将按第 9 世导入。</span><button data-excel-step="mapping">修改默认世代</button></div>
+            <div class="jp-excel-dups"><h4>逐行确认重复成员</h4><p class="jp-muted">默认跳过；选择“作为新成员导入”后需重新校验。</p><div class="jp-table-wrap"><table class="jp-table"><thead><tr><th>Excel 行</th><th>姓名</th><th>处理方式</th></tr></thead><tbody><tr><td>18</td><td>张顺平</td><td><select><option>跳过</option><option>作为新成员导入</option></select></td></tr><tr><td>67</td><td>张心兰</td><td><select><option>跳过</option><option>作为新成员导入</option></select></td></tr></tbody></table></div></div>
+            <h4 class="jp-excel-subtitle">数据样例（前 5 行）</h4>
+            <div class="jp-table-wrap"><table class="jp-table"><thead><tr><th>行</th><th>姓名</th><th>性别</th><th>世代</th><th>支系</th><th>出生日期</th><th>校验</th></tr></thead><tbody>
+              <tr><td>2</td><td>张顺安</td><td>男</td><td>默认 9</td><td>—</td><td>1982-04-10</td><td><span class="jp-badge jp-badge-green">可导入</span></td></tr>
+              <tr><td>3</td><td>张顺宁</td><td>女</td><td>默认 9</td><td>—</td><td>1985-08-16</td><td><span class="jp-badge jp-badge-green">可导入</span></td></tr>
+              <tr><td>18</td><td>张顺平</td><td>男</td><td>5</td><td>长房次支</td><td>1953-06-02</td><td><span class="jp-badge jp-badge-gold">重复</span></td></tr>
+              <tr><td>42</td><td>张心兰</td><td>女</td><td>4</td><td>长房次支</td><td>1930-05-12</td><td><span class="jp-badge jp-badge-accent">1 错误</span></td></tr>
+              <tr><td>67</td><td>张心兰</td><td>女</td><td>4</td><td>长房次支</td><td>1930-05-12</td><td><span class="jp-badge jp-badge-gold">重复</span></td></tr>
+            </tbody></table></div>
+            <h4 class="jp-excel-subtitle">问题清单</h4>
+            <div class="jp-table-wrap"><table class="jp-table"><thead><tr><th>行</th><th>级别</th><th>字段</th><th>原始值</th><th>原因 / 建议</th></tr></thead><tbody><tr><td>42</td><td><span class="jp-badge jp-badge-accent">错误</span></td><td>性别</td><td>未知</td><td>请改为“男 / 女 / 未知”之一</td></tr><tr><td>83</td><td><span class="jp-badge jp-badge-accent">错误</span></td><td>出生日期</td><td>2020-02-30</td><td>公历日期不存在</td></tr></tbody></table></div>
+            <div class="jp-detail-actions"><button data-excel-step="mapping">返回映射</button><button>导出问题报告</button><button class="jp-primary" data-modal-open="modal-excel-import">确认导入 96 人</button></div>
+          </div>
+        </div>
+        <div class="proto-step-content" data-excel-content="done">
+          <div class="jp-panel jp-excel-done"><div class="jp-excel-done-seal">成</div><h3>导入完成</h3><p>成功导入 <strong>96</strong> 人，跳过 2 行，失败 2 行。</p><p class="jp-muted">错误行未写入。可先下载问题报告，在原 Excel 中修正后重新导入。</p><div class="jp-detail-actions"><button class="jp-primary">下载问题报告</button><button>查看成员</button><button data-excel-step="file">继续导入</button></div></div>
+          <div class="jp-panel jp-excel-batches" style="margin-top:14px"><div class="jp-panel-title">最近导入批次</div><div class="jp-table-wrap"><table class="jp-table"><thead><tr><th>来源文件</th><th>时间</th><th>结果</th><th>状态</th><th>操作</th></tr></thead><tbody><tr><td>张氏成员补充表.xlsx</td><td>2026-11-25 21:20</td><td>成功 96 · 跳过 2 · 失败 2</td><td><span class="jp-badge jp-badge-green">已导入</span></td><td><button>报告</button><button class="jp-danger">撤销批次</button></td></tr></tbody></table></div></div>
+        </div>
+      </section>
+
+      <div class="proto-screen-footer"><span>家谱管理软件 · P1 高保真交互原型 v0.1</span><span>确认后再进入编码阶段</span></div>
+    </main>
+  </div>
+</div>
+
+<div class="proto-modal" id="modal-merge" hidden>
+  <div class="proto-dialog wide">
+    <div class="proto-dialog-head"><h3>合并支系</h3><button data-modal-close aria-label="关闭">×</button></div>
+    <p class="jp-muted">将所选支系及其下级支系合并到目标支系，保留全部成员与关系。</p>
+    <div class="jp-form-row" style="margin-top:14px">
+      <div class="jp-field" style="flex:1"><span>待合并支系（可多选）</span><div class="proto-check-box"><label><input type="checkbox" checked>长房次支 · 6 人 · 0 子支系</label><label><input type="checkbox" checked>长房三支 · 3 人 · 0 子支系</label><label><input type="checkbox">二房 · 10 人 · 1 子支系</label></div></div>
+      <div class="jp-field" style="width:210px"><span>合并到</span><select aria-label="合并目标支系"><option>长房</option><option>长房长支</option></select></div>
+    </div>
+    <div class="proto-impact"><div><strong>9</strong><span>迁移成员</span></div><div><strong>0</strong><span>子支系</span></div><div><strong>14</strong><span>关系记录</span></div><div><strong>张正仁</strong><span>开基祖保留</span></div></div>
+    <div class="proto-warning">来源支系将在合并后停用；成员归属、统计、PDF 范围和图谱同步更新。</div>
+    <div class="proto-dialog-actions"><button data-modal-close>取消</button><button class="jp-primary" data-prototype-action="支系合并演示完成">确认合并</button></div>
+  </div>
+</div>
+
+<div class="proto-modal" id="modal-split" hidden>
+  <div class="proto-dialog">
+    <div class="proto-dialog-head"><h3>拆分支系</h3><button data-modal-close aria-label="关闭">×</button></div>
+    <p class="jp-muted">以指定成员为新开基祖，将其所属子孙支系拆分为新支系。</p>
+    <label class="jp-field" style="margin-top:14px"><span>当前支系</span><input value="长房" readonly></label>
+    <label class="jp-field" style="margin-top:10px"><span>新开基祖</span><input value="张天佑 · 三世"></label>
+    <label class="jp-field" style="margin-top:10px"><span>新支系名称</span><input value="长房天佑支"></label>
+    <div class="proto-impact"><div><strong>6</strong><span>迁移成员</span></div><div><strong>1</strong><span>子支系</span></div><div><strong>9</strong><span>关系记录</span></div><div><strong>1</strong><span>字辈继承</span></div></div>
+    <div class="proto-warning">拆分只调整支系归属，不改变父母、配偶、子女等亲属关系。</div>
+    <div class="proto-dialog-actions"><button data-modal-close>取消</button><button class="jp-primary" data-prototype-action="支系拆分演示完成">确认拆分</button></div>
+  </div>
+</div>
+
+<div class="proto-modal" id="modal-migrate" hidden>
+  <div class="proto-dialog wide">
+    <div class="proto-dialog-head"><h3>迁移成员</h3><button data-modal-close aria-label="关闭">×</button></div>
+    <p class="jp-muted">支持单个或批量调整成员所属支系，亲属关系保持不变。</p>
+    <div class="jp-form-row" style="margin-top:14px"><label class="jp-field"><span>当前支系</span><select><option>长房</option></select></label><label class="jp-field"><span>目标支系</span><select><option>长房长支</option><option>二房</option></select></label></div>
+    <div class="jp-table-wrap"><table class="jp-table"><thead><tr><th>选择</th><th>姓名</th><th>世代</th><th>当前支系</th></tr></thead><tbody><tr><td><input type="checkbox" checked></td><td>张天佑</td><td>三世</td><td>长房次支</td></tr><tr><td><input type="checkbox" checked></td><td>张天顺</td><td>三世</td><td>长房三支</td></tr><tr><td><input type="checkbox"></td><td>张正忠</td><td>二世</td><td>长房</td></tr></tbody></table></div>
+    <div class="proto-warning">兼祧成员的双重房支归属会保留，不被本次单支系迁移覆盖。</div>
+    <div class="proto-dialog-actions"><button data-modal-close>取消</button><button class="jp-primary" data-prototype-action="成员迁移演示完成">确认迁移 2 人</button></div>
+  </div>
+</div>
+
+<div class="proto-modal" id="modal-png" hidden>
+  <div class="proto-dialog">
+    <div class="proto-dialog-head"><h3>导出图谱 PNG</h3><button data-modal-close aria-label="关闭">×</button></div>
+    <label class="jp-field"><span>导出范围</span><select><option>当前已展开的可见子图</option><option>当前视口</option></select></label>
+    <div class="jp-panel-title" style="margin-top:14px">清晰度</div><div class="proto-choice-row"><button aria-pressed="true">1×</button><button>2×</button><button>4×</button></div>
+    <div class="proto-dimension"><span class="jp-muted">预计尺寸</span><br><strong>1960 × 1120 px</strong></div>
+    <div class="proto-dialog-actions"><button data-modal-close>取消</button><button class="jp-primary" data-prototype-action="PNG 导出演示完成">导出 PNG</button></div>
+  </div>
+</div>
+
+<div class="proto-modal" id="modal-member-merge" hidden>
+  <div class="proto-dialog wide">
+    <div class="proto-dialog-head"><h3>确认合并成员</h3><button data-modal-close aria-label="关闭">×</button></div>
+    <p>将“张心兰”（右侧）合并到“张心兰”（左侧），保留左侧成员 ID。</p>
+    <div class="proto-impact"><div><strong>1</strong><span>保留成员</span></div><div><strong>1</strong><span>软删除成员</span></div><div><strong>7</strong><span>合并关系</span></div><div><strong>0</strong><span>孤儿关系</span></div></div>
+    <div class="proto-check-box"><label><input type="checkbox" checked>合并照片、备注与支系归属</label><label><input type="checkbox" checked>父母、配偶、子女关系去重</label><label><input type="checkbox" checked>保留特殊关系标记</label></div>
+    <div class="proto-warning">此操作必须人工确认；执行后可在提示条中撤销。</div>
+    <div class="proto-dialog-actions"><button data-modal-close>取消</button><button class="jp-primary" data-prototype-action="成员合并演示完成">确认合并</button></div>
+  </div>
+</div>
+
+<div class="proto-modal" id="modal-excel-import" hidden>
+  <div class="proto-dialog">
+    <div class="proto-dialog-head"><h3>确认导入成员</h3><button data-modal-close aria-label="关闭">×</button></div>
+    <p>将导入 <strong>96</strong> 位成员。错误行不会写入，导入后可在“最近导入批次”中整批撤销。</p>
+    <div class="proto-impact"><div><strong>96</strong><span>可导入</span></div><div><strong>2</strong><span>跳过</span></div><div><strong>2</strong><span>失败</span></div><div><strong>9</strong><span>默认世代</span></div></div>
+    <div class="proto-warning">导入过程使用事务，异常时完整回滚；不执行公式、宏、外部链接或脚本。</div>
+    <div class="proto-dialog-actions"><button data-modal-close>取消</button><button class="jp-primary" data-prototype-action="excel-done">开始导入</button></div>
+  </div>
+</div>
+
+<div class="proto-toast" id="proto-toast" role="status"></div>
+
+<script>
+  const screens = [...document.querySelectorAll('.proto-screen')];
+  const navButtons = [...document.querySelectorAll('[data-screen-link]')];
+  const toast = document.getElementById('proto-toast');
+  let toastTimer;
+
+  function showToast(message) {
+    toast.textContent = message + '（原型演示，不写入真实数据）';
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 2800);
+  }
+
+  function showScreen(name, updateUrl = true) {
+    const target = screens.find((screen) => screen.dataset.screen === name) || screens[0];
+    screens.forEach((screen) => screen.classList.toggle('active', screen === target));
+    document.querySelectorAll('.jp-sidebar .jp-navbtn').forEach((button) => {
+      if (button.dataset.screenLink) button.setAttribute('aria-current', button.dataset.screenLink === target.dataset.screen ? 'page' : 'false');
+    });
+    document.querySelector('.proto-main').scrollTop = 0;
+    if (updateUrl) {
+      const url = new URL(location.href);
+      url.searchParams.set('screen', target.dataset.screen);
+      history.replaceState(null, '', url);
+    }
+  }
+
+  navButtons.forEach((button) => button.addEventListener('click', () => showScreen(button.dataset.screenLink)));
+
+  document.querySelectorAll('[data-modal-open]').forEach((button) => {
+    button.addEventListener('click', () => {
+      document.querySelectorAll('.proto-modal').forEach((modal) => modal.hidden = true);
+      const modal = document.getElementById(button.dataset.modalOpen);
+      if (modal) modal.hidden = false;
+    });
+  });
+  document.querySelectorAll('[data-modal-close]').forEach((button) => button.addEventListener('click', () => button.closest('.proto-modal').hidden = true));
+  document.querySelectorAll('.proto-modal').forEach((modal) => modal.addEventListener('click', (event) => { if (event.target === modal) modal.hidden = true; }));
+  document.addEventListener('keydown', (event) => { if (event.key === 'Escape') document.querySelectorAll('.proto-modal').forEach((modal) => modal.hidden = true); });
+
+  document.querySelectorAll('[data-prototype-action]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const action = button.dataset.prototypeAction;
+      button.closest('.proto-modal').hidden = true;
+      if (action === 'excel-done') {
+        showExcelStep('done');
+        showScreen('excel', false);
+      }
+      showToast(action);
+    });
+  });
+
+  document.querySelectorAll('.bio-page').forEach((button) => {
+    button.addEventListener('click', () => {
+      document.querySelectorAll('.bio-page').forEach((item) => item.classList.toggle('active', item === button));
+      document.querySelectorAll('[id^="bio-page-"]').forEach((page) => page.hidden = page.id !== 'bio-page-' + button.dataset.bioPage);
+    });
+  });
+
+  function showExcelStep(step) {
+    document.querySelectorAll('.excel-step').forEach((button) => {
+      button.classList.toggle('active', button.dataset.excelStep === step);
+      button.classList.toggle('done', ['file', 'mapping', 'preview', 'done'].indexOf(button.dataset.excelStep) < ['file', 'mapping', 'preview', 'done'].indexOf(step));
+    });
+    document.querySelectorAll('[data-excel-content]').forEach((content) => content.classList.toggle('active', content.dataset.excelContent === step));
+  }
+  document.querySelectorAll('[data-excel-step]').forEach((button) => button.addEventListener('click', () => showExcelStep(button.dataset.excelStep)));
+
+  const graphNodes = [
+    { id: 'g1', name: '张国栋', years: '1850–1921', gender: '男', gen: 0, row: 2 },
+    { id: 's1', name: '李秀兰', years: '1853–1930', gender: '女', gen: 0, row: 2, spouse: true, offset: 1 },
+    { id: 'g2', name: '张正仁', years: '1874–1946', gender: '男', gen: 1, row: 1 },
+    { id: 's2', name: '王淑贞', years: '1876–1950', gender: '女', gen: 1, row: 1, spouse: true, offset: 1 },
+    { id: 'g3', name: '张正忠', years: '1877–1952', gender: '男', gen: 1, row: 4 },
+    { id: 's3', name: '赵春娥', years: '1880–1955', gender: '女', gen: 1, row: 4, spouse: true, offset: 1 },
+    { id: 'g4', name: '张天德', years: '1899–1972', gender: '男', gen: 2, row: 0 },
+    { id: 'g5', name: '张天佑', years: '1902–1977', gender: '男', gen: 2, row: 2 },
+    { id: 's4', name: '周桂英', years: '1905–1982', gender: '女', gen: 2, row: 2, spouse: true, offset: 1 },
+    { id: 'g6', name: '张天顺', years: '1905–1983', gender: '男', gen: 2, row: 4 },
+    { id: 'g7', name: '张心远', years: '1924–2003', gender: '男', gen: 3, row: 0 },
+    { id: 'g8', name: '张心兰', years: '1930–2018', gender: '女', gen: 3, row: 2, selected: true },
+    { id: 'g9', name: '张心诚', years: '1932–2015', gender: '男', gen: 3, row: 4 },
+  ];
+  const graphEdges = [
+    ['g1', 'g2'], ['g1', 'g3'], ['g2', 'g4'], ['g2', 'g5'], ['g3', 'g6'], ['g4', 'g7'], ['g5', 'g8'], ['g6', 'g9'],
+    ['g1', 's1', 'spouse'], ['g2', 's2', 'spouse'], ['g3', 's3', 'spouse'], ['g5', 's4', 'spouse'],
+  ];
+  let orientation = 'horizontal';
+
+  function renderGraph() {
+    const svg = document.getElementById('proto-graph-svg');
+    const laneMap = new Map([...new Set(graphNodes.map((node) => node.row))].map((row, index) => [row, index]));
+    const positioned = graphNodes.map((node) => {
+      const lane = laneMap.get(node.row);
+      if (orientation === 'horizontal') return { ...node, x: 56 + node.gen * 210 + (node.offset ? 126 : 0), y: 42 + lane * 110 };
+      return { ...node, x: 20 + lane * 220 + (node.offset ? 126 : 0), y: 38 + node.gen * 130 };
+    });
+    const map = new Map(positioned.map((node) => [node.id, node]));
+    const edges = graphEdges.map(([from, to, kind]) => {
+      const a = map.get(from), b = map.get(to);
+      if (kind === 'spouse') return `<path class="proto-edge spouse" d="M${a.x + 112} ${a.y + 24} H${b.x}"></path>`;
+      if (orientation === 'horizontal') {
+        const sx = a.x + 112, sy = a.y + 24, tx = b.x, ty = b.y + 24, mid = sx + (tx - sx) / 2;
+        return `<path class="proto-edge" d="M${sx} ${sy} H${mid} V${ty} H${tx}"></path>`;
+      }
+      const sx = a.x + 56, sy = a.y + 48, tx = b.x + 56, ty = b.y, mid = sy + (ty - sy) / 2;
+      return `<path class="proto-edge" d="M${sx} ${sy} V${mid} H${tx} V${ty}"></path>`;
+    }).join('');
+    const nodes = positioned.map((node) => `<g class="proto-gnode ${node.gender === '女' ? 'female' : ''} ${node.spouse ? 'spouse' : ''} ${node.selected ? 'active' : ''}" data-node="${node.name}"><rect x="${node.x}" y="${node.y}" width="112" height="48" rx="4"></rect><text x="${node.x + 56}" y="${node.y + 20}" text-anchor="middle">${node.name}</text><text class="sub" x="${node.x + 56}" y="${node.y + 36}" text-anchor="middle">${node.years}</text>${node.gender === '女' ? `<text class="female-tag" x="${node.x + 6}" y="${node.y + 13}">女</text>` : ''}</g>`).join('');
+    svg.innerHTML = edges + nodes;
+    svg.querySelectorAll('[data-node]').forEach((node) => node.addEventListener('click', () => {
+      svg.querySelectorAll('.proto-gnode').forEach((item) => item.classList.remove('active'));
+      node.classList.add('active');
+      showToast('已选中「' + node.dataset.node + '」');
+    }));
+  }
+  document.querySelectorAll('[data-orientation]').forEach((button) => button.addEventListener('click', () => {
+    orientation = button.dataset.orientation;
+    document.querySelectorAll('[data-orientation]').forEach((item) => item.setAttribute('aria-pressed', item === button ? 'true' : 'false'));
+    renderGraph();
+  }));
+
+  document.querySelectorAll('[data-scale]').forEach((button) => button.addEventListener('click', () => {
+    document.querySelectorAll('[data-scale]').forEach((item) => item.setAttribute('aria-pressed', item === button ? 'true' : 'false'));
+    const scale = Number(button.dataset.scale);
+    const size = `${1960 * scale} × ${1120 * scale} px`;
+    document.getElementById('png-dimensions').textContent = size;
+    document.getElementById('png-size-label').textContent = size;
+  }));
+  document.querySelectorAll('[data-bg]').forEach((button) => button.addEventListener('click', () => {
+    document.querySelectorAll('[data-bg]').forEach((item) => item.setAttribute('aria-pressed', item === button ? 'true' : 'false'));
+    const preview = document.getElementById('png-preview');
+    preview.classList.remove('white', 'rice');
+    if (button.dataset.bg !== 'transparent') preview.classList.add(button.dataset.bg);
+  }));
+
+  document.querySelectorAll('.proto-group').forEach((button) => button.addEventListener('click', () => {
+    document.querySelectorAll('.proto-group').forEach((item) => item.setAttribute('aria-pressed', item === button ? 'true' : 'false'));
+    showToast('已切换疑似重复组');
+  }));
+  document.querySelectorAll('.proto-choice-table input[type="radio"]').forEach((radio) => radio.addEventListener('change', () => {
+    const row = radio.closest('tr');
+    row.querySelectorAll('td').forEach((cell) => cell.style.background = '');
+    if (radio.name.startsWith('f-')) row.cells[radio.name === 'f-name' ? (radio.checked ? 1 : 2) : (radio.checked ? 1 : 2)].style.background = 'var(--jp-paper)';
+  }));
+
+  renderGraph();
+  const params = new URLSearchParams(location.search);
+  const initialScreen = params.get('screen') || 'overview';
+  showScreen(initialScreen, false);
+  const initialOrientation = params.get('orientation');
+  if (initialOrientation === 'vertical') document.querySelector('[data-orientation="vertical"]').click();
+  const initialModal = params.get('modal');
+  if (initialModal) {
+    const modal = document.getElementById(initialModal);
+    if (modal) modal.hidden = false;
+  }
+</script>
+</body>
+</html>

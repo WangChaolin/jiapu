@@ -9,7 +9,7 @@ export interface Toast {
   action?: { label: string; fn: () => void }
 }
 
-export type Page = 'members' | 'form' | 'graph' | 'zibei' | 'branch' | 'pdf' | 'backup' | 'settings'
+export type Page = 'members' | 'form' | 'graph' | 'zibei' | 'branch' | 'pdf' | 'gedcom' | 'backup' | 'settings'
 
 interface State {
   ready: boolean

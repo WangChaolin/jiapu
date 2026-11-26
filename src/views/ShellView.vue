@@ -8,6 +8,7 @@ import GraphView from './GraphView.vue'
 import ZibeiView from './ZibeiView.vue'
 import BranchView from './BranchView.vue'
 import PdfView from './PdfView.vue'
+import GedcomView from './GedcomView.vue'
 import BackupView from './BackupView.vue'
 import SettingsView from './SettingsView.vue'
 
@@ -18,13 +19,14 @@ const NAV: { key: Page; label: string; icon: string }[] = [
   { key: 'zibei', label: '字辈管理', icon: '<path d="M3 2h10M3 6h10M3 10h7M3 14h5"/>' },
   { key: 'branch', label: '支系管理', icon: '<path d="M8 2v4m0 0-4 3v5m4-8 4 3v5"/><circle cx="8" cy="2" r="1.4"/><circle cx="4" cy="14" r="1.4"/><circle cx="12" cy="14" r="1.4"/>' },
   { key: 'pdf', label: '导出 PDF', icon: '<path d="M4 1.5h5.5L12 4v10.5H4z"/><path d="M9.5 1.5V4H12M6 8h4M6 11h4"/>' },
+  { key: 'gedcom', label: 'GEDCOM 交换', icon: '<path d="M3 2h7l3 3v9H3z"/><path d="M6 7h4M6 10h4M6 13h3"/>' },
   { key: 'backup', label: '备份恢复', icon: '<path d="M8 1.5 13 3v5c0 3.5-2.2 5.5-5 6.5C5.2 13.5 3 11.5 3 8V3z"/><path d="M5.8 8l1.6 1.6 3-3"/>' },
   { key: 'settings', label: '设置 · 皮肤', icon: '<circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M12.6 3.4l-1.4 1.4M4.8 11.2l-1.4 1.4"/>' },
 ]
 
 const VIEWS: Record<Page, unknown> = {
   members: MembersView, form: MemberFormView, graph: GraphView, zibei: ZibeiView,
-  branch: BranchView, pdf: PdfView, backup: BackupView, settings: SettingsView,
+  branch: BranchView, pdf: PdfView, gedcom: GedcomView, backup: BackupView, settings: SettingsView,
 }
 const activeView = computed(() => VIEWS[state.page])
 const title = computed(() => state.current ? `${state.current.name}${state.current.hall ? ' · ' + state.current.hall : ''}` : '')

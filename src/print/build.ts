@@ -1,9 +1,15 @@
 import type { Branch, GenealogyMeta, GraphData, Member, ZibeiPoem } from '@shared/types'
 import { buildTree, computeLayout, NODE_H, NODE_W, LEVEL_H } from '../graph/layout'
-import { yearOf } from '@shared/lunar'
+import { yearOf } from '../../electron/shared/lunar'
 
-export type LayoutKind = 'baota' | 'oushi' | 'sushi'
-export type Scope = { kind: 'all' } | { kind: 'branch'; branchId: string } | { kind: 'gen'; from: number; to: number }
+export type LayoutKind = 'baota' | 'oushi' | 'sushi' | 'biography' | 'roster'
+export type Scope =
+  | { kind: 'all' }
+  | { kind: 'branch'; branchId: string }
+  | { kind: 'gen'; from: number; to: number }
+  | { kind: 'members'; memberIds: string[] }
+export type RosterField = 'name' | 'gender' | 'generation' | 'zibei' | 'branch' | 'years' | 'parents' | 'spouses' | 'residence' | 'burial'
+export type RosterSort = 'generation' | 'birthOrder' | 'name' | 'branch'
 
 export interface PrintOptions {
   layout: LayoutKind
@@ -15,6 +21,8 @@ export interface PrintOptions {
   cover: boolean
   toc: boolean
   zibeiPage: boolean
+  rosterFields: RosterField[]
+  rosterSort: RosterSort
 }
 
 const FONT_FAMILY: Record<PrintOptions['font'], string> = {
@@ -57,7 +65,249 @@ export function scopeIds(data: GraphData, branches: Branch[], scope: Scope): Set
     const bs = branchSubtree(branches, scope.branchId)
     return new Set(data.members.filter((m) => m.branchId && bs.has(m.branchId)).map((m) => m.id))
   }
+  if (scope.kind === 'members') {
+    const ids = new Set(data.members.map((m) => m.id))
+    return new Set(scope.memberIds.filter((id) => ids.has(id)))
+  }
   return new Set(data.members.filter((m) => m.generation >= scope.from && m.generation <= scope.to).map((m) => m.id))
+}
+
+export const ROSTER_FIELD_DEFS: { key: RosterField; label: string }[] = [
+  { key: 'name', label: '姓名' }, { key: 'gender', label: '性别' },
+  { key: 'generation', label: '世代' }, { key: 'zibei', label: '字辈' },
+  { key: 'branch', label: '支系' }, { key: 'years', label: '生卒' },
+  { key: 'parents', label: '父母' }, { key: 'spouses', label: '配偶' },
+  { key: 'residence', label: '居地' }, { key: 'burial', label: '葬地' },
+]
+export const DEFAULT_ROSTER_FIELDS: RosterField[] = ['name', 'gender', 'generation', 'branch', 'years']
+const ROSTER_FIELD_KEYS = new Set<string>(ROSTER_FIELD_DEFS.map((f) => f.key))
+
+export function normalizeRosterFields(fields: RosterField[] | undefined): RosterField[] {
+  const selected = new Set((fields ?? DEFAULT_ROSTER_FIELDS).filter((f) => ROSTER_FIELD_KEYS.has(f)))
+  const normalized = ROSTER_FIELD_DEFS.map((f) => f.key).filter((f) => selected.has(f))
+  return normalized.length ? normalized : ['name']
+}
+
+export interface P1Metrics {
+  pageW: number
+  pageH: number
+  contentW: number
+  contentH: number
+  pt: number
+  lineH: number
+  headerH: number
+  bodyH: number
+  bodyChars: number
+  profileChars: number
+  photoW: number
+  photoH: number
+}
+
+export function p1Metrics(opts: PrintOptions): P1Metrics {
+  const [w, h] = PAPER_MM[opts.paper]
+  const pageW = opts.landscape ? h : w, pageH = opts.landscape ? w : h
+  const contentW = pageW - 28, contentH = pageH - 28
+  const pt = FONT_PT[opts.fontSize]
+  const lineH = pt * 0.3528 * 1.5
+  const runningH = (pt - 2) * 0.3528 * 1.5 + 3 + 0.25
+  const headerH = runningH + 5 + 2 + (pt + 3) * 0.3528 * 1.5 + 5
+  const bodyH = Math.max(lineH, contentH - headerH - 9)
+  const photoW = 34, photoH = 42
+  const charW = pt * 0.3528
+  return {
+    pageW, pageH, contentW, contentH, pt, lineH, headerH, bodyH,
+    bodyChars: Math.max(6, Math.floor(contentW / charW) - 2),
+    profileChars: Math.max(6, Math.floor((contentW - photoW - 5) / charW)),
+    photoW, photoH,
+  }
+}
+
+export function scopeMembers(data: GraphData, branches: Branch[], scope: Scope): Member[] {
+  const ids = scopeIds(data, branches, scope)
+  const members = ids ? data.members.filter((m) => ids.has(m.id)) : [...data.members]
+  return members.sort((a, b) => a.generation - b.generation || a.birthOrder - b.birthOrder || a.name.localeCompare(b.name, 'zh') || a.id.localeCompare(b.id))
+}
+
+export function sortRosterMembers(members: Member[], branches: Branch[], sort: RosterSort): Member[] {
+  const branchOrder = new Map(branches.map((b, index) => [b.id, index]))
+  const cmp = (a: Member, b: Member): number => a.generation - b.generation || a.birthOrder - b.birthOrder || a.name.localeCompare(b.name, 'zh') || a.id.localeCompare(b.id)
+  return [...members].sort((a, b) => {
+    let r = 0
+    if (sort === 'birthOrder') r = a.birthOrder - b.birthOrder || cmp(a, b)
+    else if (sort === 'name') r = a.name.localeCompare(b.name, 'zh') || cmp(a, b)
+    else if (sort === 'branch') {
+      if (!a.branchId && b.branchId) r = 1
+      else if (a.branchId && !b.branchId) r = -1
+      else if (a.branchId && b.branchId) {
+        const ai = branchOrder.get(a.branchId) ?? Number.MAX_SAFE_INTEGER
+        const bi = branchOrder.get(b.branchId) ?? Number.MAX_SAFE_INTEGER
+        r = ai - bi
+      }
+    } else r = cmp(a, b)
+    return r || cmp(a, b) || a.id.localeCompare(b.id)
+  })
+}
+
+export function wrapPrintText(text: string, maxChars: number): string[] {
+  const source = String(text ?? '')
+  if (!source) return []
+  const width = Math.max(1, maxChars)
+  const out: string[] = []
+  for (const paragraph of source.replace(/\r\n?/g, '\n').split('\n')) {
+    if (!paragraph) { out.push(''); continue }
+    let line = ''
+    for (const ch of Array.from(paragraph)) {
+      if (line && Array.from(line).length >= width) { out.push(line); line = ch }
+      else line += ch
+    }
+    if (line) out.push(line)
+  }
+  return out
+}
+
+function relationMaps(data: GraphData): {
+  parents: Map<string, string[]>
+  spouses: Map<string, string[]>
+  children: Map<string, string[]>
+} {
+  const parents = new Map<string, string[]>(), spouses = new Map<string, string[]>(), children = new Map<string, string[]>()
+  const byId = new Map(data.members.map((m) => [m.id, m]))
+  const add = (map: Map<string, string[]>, key: string, value: string): void => {
+    if (!map.has(key)) map.set(key, [])
+    if (!map.get(key)!.includes(value)) map.get(key)!.push(value)
+  }
+  for (const e of data.edges) {
+    if (!byId.has(e.from) || !byId.has(e.to)) continue
+    if (e.type === 'parent_child') {
+      add(parents, e.to, `${e.subtype ? `${e.subtype}：` : ''}${byId.get(e.from)!.name}`)
+      add(children, e.from, byId.get(e.to)!.name)
+    } else {
+      add(spouses, e.from, `${e.subtype ? `${e.subtype}：` : ''}${byId.get(e.to)!.name}`)
+      add(spouses, e.to, `${e.subtype ? `${e.subtype}：` : ''}${byId.get(e.from)!.name}`)
+    }
+  }
+  for (const list of children.values()) list.sort((a, b) => a.localeCompare(b, 'zh'))
+  return { parents, spouses, children }
+}
+
+export function rosterValues(
+  member: Member, data: GraphData, branches: Branch[], zibei: ZibeiPoem[], maps = relationMaps(data),
+): Record<RosterField, string> {
+  const rel = (id: string): string => (maps.parents.get(id) ?? []).join('、')
+  const spouses = (maps.spouses.get(member.id) ?? []).join('、')
+  const zi = zibei.find((z) => z.branchId === member.branchId)?.entries.find((e) => e.generation === member.generation)?.char ?? ''
+  return {
+    name: member.name, gender: member.gender, generation: gen(member.generation), zibei: zi,
+    branch: branches.find((b) => b.id === member.branchId)?.name ?? '', years: years(member),
+    parents: rel(member.id), spouses, residence: member.residence, burial: member.burial,
+  }
+}
+
+const ROSTER_WEIGHTS: Record<RosterField, number> = {
+  name: 3, gender: 1, generation: 1.4, zibei: 1, branch: 2,
+  years: 2.5, parents: 3.5, spouses: 3, residence: 2.5, burial: 2.5,
+}
+
+export function rosterColumnWidths(fields: RosterField[], contentW: number): number[] {
+  const ordered = normalizeRosterFields(fields)
+  const total = ordered.reduce((sum, f) => sum + ROSTER_WEIGHTS[f], 0)
+  return ordered.map((f) => contentW * ROSTER_WEIGHTS[f] / total)
+}
+
+export interface RosterRow { id: string; values: Record<RosterField, string> }
+export interface RosterPagePlan { rows: RosterRow[]; start: number }
+export interface RosterPlan { fields: RosterField[]; pages: RosterPagePlan[]; rowH: number; headerH: number }
+
+export function planRosterPages(
+  data: GraphData, branches: Branch[], zibei: ZibeiPoem[], members: Member[], opts: PrintOptions,
+): RosterPlan {
+  const fields = normalizeRosterFields(opts.rosterFields)
+  const metrics = p1Metrics(opts)
+  const tableHeadH = 8
+  const rowH = metrics.lineH + 3.2
+  const capacity = Math.max(1, Math.floor((metrics.bodyH - tableHeadH) / rowH))
+  const maps = relationMaps(data)
+  const rows = sortRosterMembers(members, branches, opts.rosterSort).map((m) => ({ id: m.id, values: rosterValues(m, data, branches, zibei, maps) }))
+  const pages: RosterPagePlan[] = []
+  for (let i = 0; i < rows.length; i += capacity) pages.push({ rows: rows.slice(i, i + capacity), start: i })
+  return { fields, pages, rowH, headerH: tableHeadH }
+}
+
+export interface BiographyPagePlan {
+  memberId: string
+  memberName: string
+  continuation: boolean
+  profile: string[]
+  body: { text: string; section: boolean }[]
+  photo: boolean
+}
+
+function biographyProfile(member: Member, data: GraphData, branches: Branch[], metrics: P1Metrics, maps: ReturnType<typeof relationMaps>): string[] {
+  const rows: [string, string][] = [
+    ['性别', member.gender], ['世代', gen(member.generation)], ['字', member.courtesyName || '—'], ['号', member.title || '—'],
+    ['生卒', years(member) || '—'], ['父母', (maps.parents.get(member.id) ?? []).join('、') || '—'],
+    ['配偶', (maps.spouses.get(member.id) ?? []).join('、') || '—'], ['子女', (maps.children.get(member.id) ?? []).join('、') || '—'],
+    ['支系', branches.find((b) => b.id === member.branchId)?.name || '—'], ['居地', member.residence || '—'], ['葬地', member.burial || '—'],
+  ]
+  return rows.flatMap(([label, value]) => wrapPrintText(`${label}：${value}`, metrics.profileChars))
+}
+
+function paginateBiographyBody(items: { text: string; section: boolean }[], capacity: number): { text: string; section: boolean }[][] {
+  const pages: { text: string; section: boolean }[][] = []
+  let at = 0
+  while (at < items.length) {
+    const page: { text: string; section: boolean }[] = []
+    while (at < items.length && page.length < capacity) {
+      const item = items[at]
+      if (item.section && page.length + 2 > capacity) break
+      page.push(item)
+      at++
+    }
+    if (!page.length) { page.push(items[at]); at++ }
+    pages.push(page)
+  }
+  return pages
+}
+
+export function planBiographyPages(data: GraphData, branches: Branch[], members: Member[], opts: PrintOptions): BiographyPagePlan[] {
+  const metrics = p1Metrics(opts)
+  const maps = relationMaps(data)
+  const pages: BiographyPagePlan[] = []
+  const fullBodyCap = Math.max(1, Math.floor(metrics.bodyH / metrics.lineH))
+  for (const member of sortRosterMembers(members, branches, 'generation')) {
+    const profile = biographyProfile(member, data, branches, metrics, maps)
+    const photo = !!member.photoPath
+    const profileCap = Math.max(1, Math.floor((metrics.bodyH - (photo ? metrics.photoH + 2 : 0)) / metrics.lineH))
+    const fullProfileCap = Math.max(1, Math.floor(metrics.bodyH / metrics.lineH))
+    const chunks: { lines: string[]; first: boolean; bodyCap: number }[] = []
+    for (let at = 0, first = true; at < profile.length; first = false) {
+      const cap = first ? profileCap : fullProfileCap
+      const lines = profile.slice(at, at + cap)
+      at += lines.length
+      const usedH = Math.max(lines.length * metrics.lineH, first && photo ? metrics.photoH : 0)
+      chunks.push({ lines, first, bodyCap: Math.max(0, Math.floor((metrics.bodyH - usedH - 2) / metrics.lineH)) })
+    }
+    const bio = wrapPrintText(member.biography.trim() ? member.biography : '—', metrics.bodyChars)
+    const notes = wrapPrintText(member.remark.trim() ? member.remark : '—', metrics.bodyChars)
+    const items: { text: string; section: boolean }[] = []
+    if (bio.length) items.push({ text: '生平', section: true }, ...bio.map((text) => ({ text, section: false })))
+    if (notes.length) items.push({ text: '备注', section: true }, ...notes.map((text) => ({ text, section: false })))
+    let bodyPages: { text: string; section: boolean }[][] = []
+    let bodyAt = 0
+    chunks.forEach((chunk, i) => {
+      const body: { text: string; section: boolean }[] = []
+      const cap = i === chunks.length - 1 ? chunk.bodyCap : 0
+      if (cap > 1) {
+        const page = paginateBiographyBody(items.slice(bodyAt), cap)[0] ?? []
+        body.push(...page)
+        bodyAt += page.length
+      }
+      pages.push({ memberId: member.id, memberName: member.name, continuation: !chunk.first, profile: chunk.lines, body, photo: chunk.first && photo })
+    })
+    if (bodyAt < items.length) bodyPages = paginateBiographyBody(items.slice(bodyAt), fullBodyCap)
+    for (const body of bodyPages) pages.push({ memberId: member.id, memberName: member.name, continuation: true, profile: [], body, photo: false })
+  }
+  return pages
 }
 
 const CN = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十', '十一', '十二', '十三', '十四', '十五', '十六', '十七', '十八', '十九', '二十']
@@ -108,6 +358,25 @@ function baseCss(opts: PrintOptions, forPreview: boolean): string {
   .sushi-name { font-size:${pt + 2}pt; letter-spacing:3px; flex:none; white-space:nowrap; }
   .sushi-sub { font-size:${pt - 3}pt; color:var(--muted); letter-spacing:1px; flex:none; white-space:nowrap; }
   .sushi-female { color:var(--blue); }
+  .page.p1-page { min-height:${ch}mm; ${forPreview ? `width:${cw + 20}mm; min-height:${ch + 20}mm;` : ''} }
+  .p1-folio { position:absolute; left:0; right:0; bottom:1mm; text-align:center; color:var(--muted); font-size:${pt - 2}pt; letter-spacing:1px; }
+  .bio-layout { width:100%; }
+  .bio-layout::after { content:""; display:block; clear:both; }
+  .bio-photo { float:right; width:34mm; height:42mm; margin-left:5mm; border:1px solid var(--line); display:flex; align-items:center; justify-content:center; background:#f3eddd; color:var(--muted); font-size:${pt - 2}pt; }
+  .bio-photo img { display:block; width:100%; height:100%; object-fit:contain; }
+  .bio-profile { min-height:1mm; }
+  .bio-profile.with-photo { width:calc(100% - 39mm); }
+  .bio-line { height:${pt * 0.3528 * 1.5}mm; line-height:${pt * 0.3528 * 1.5}mm; white-space:pre; }
+  .bio-section { color:var(--accent); font-weight:500; letter-spacing:2px; border-bottom:1px solid var(--line); height:${pt * 0.3528 * 1.5}mm; line-height:${pt * 0.3528 * 1.5}mm; margin:0; padding:0; }
+  .bio-content.after-profile { margin-top:2mm; }
+  .bio-body .bio-line, .bio-text { text-indent:2em; }
+  table.roster { width:100%; border-collapse:collapse; table-layout:fixed; }
+  .roster thead { display:table-header-group; }
+  .roster tr { break-inside:avoid; page-break-inside:avoid; }
+  .roster th,.roster td { border:1px solid var(--line); padding:1.6mm 1.2mm; text-align:left; vertical-align:middle; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+  .roster th { background:#efe7d2; font-weight:500; text-align:center; letter-spacing:1px; height:8mm; }
+  .roster td { height:${pt * 0.3528 * 1.5 + 3.2}mm; font-size:${pt - 1}pt; }
+  .roster td:first-child { color:var(--ink); }
   .note { text-align:center; color:var(--muted); font-size:${pt - 2}pt; margin-top:4mm; letter-spacing:1px; }
   `
 }
@@ -310,6 +579,57 @@ function sushiHtml(data: GraphData, meta: GenealogyMeta, scope: Set<string> | un
   return { html, volumes }
 }
 
+function p1Folio(no: number): string {
+  return `<div class="p1-folio">${no}</div>`
+}
+
+function biographyHtml(data: GraphData, meta: GenealogyMeta, branches: Branch[], members: Member[], opts: PrintOptions, folioOffset: number): { html: string; volumes: string[] } {
+  const metrics = p1Metrics(opts)
+  const byId = new Map(data.members.map((m) => [m.id, m]))
+  const pages = planBiographyPages(data, branches, members, opts)
+  const volumes: string[] = pages.length ? ['人物傳記'] : []
+  let html = ''
+  pages.forEach((pg, i) => {
+    const m = byId.get(pg.memberId)!
+    const title = `${m.name}传${pg.continuation ? '（续）' : ''}`
+    const photo = pg.photo && m.photoPath
+      ? `<div class="bio-photo"><img src="jpimg://${esc(meta.id)}/${m.photoPath.split('/').map((s) => encodeURIComponent(s)).join('/')}" alt="${esc(m.name)}照片"></div>`
+      : ''
+    const profile = pg.profile.length
+      ? `<div class="bio-profile${photo ? ' with-photo' : ''}">${pg.profile.map((line) => `<div class="bio-line">${esc(line)}</div>`).join('')}</div>`
+      : ''
+    const bodyHtml = pg.body.length ? `<div class="bio-content${pg.profile.length || pg.photo ? ' after-profile' : ''}">${pg.body.map((line) => line.section
+      ? `<div class="bio-section">${esc(line.text)}</div>`
+      : `<div class="bio-line bio-text">${line.text ? esc(line.text) : '&nbsp;'}</div>`).join('')}</div>` : ''
+    html += `<section class="page p1-page"><div class="running">${esc(meta.name)}${meta.hall ? ' · ' + esc(meta.hall) : ''} · 人物传记</div>
+      <div class="vol-title">${esc(title)}</div><div class="bio-layout">${photo}${profile}</div>${bodyHtml}${p1Folio(folioOffset + i + 1)}</section>`
+  })
+  if (!pages.length) html = `<section class="page p1-page"><div class="running">${esc(meta.name)} · 人物传记</div><div class="vol-title">人物传记</div><p class="note">所選範圍內暫無成員</p>${p1Folio(folioOffset + 1)}</section>`
+  return { html, volumes }
+}
+
+function rosterHtml(data: GraphData, meta: GenealogyMeta, branches: Branch[], zibei: ZibeiPoem[], members: Member[], opts: PrintOptions, folioOffset: number): { html: string; volumes: string[] } {
+  const metrics = p1Metrics(opts)
+  const plan = planRosterPages(data, branches, zibei, members, opts)
+  const widths = rosterColumnWidths(plan.fields, metrics.contentW)
+  const labels = new Map(ROSTER_FIELD_DEFS.map((f) => [f.key, f.label]))
+  const colgroup = `<colgroup>${plan.fields.map((f, i) => `<col style="width:${widths[i].toFixed(3)}mm">`).join('')}</colgroup>`
+  const head = `<thead><tr>${plan.fields.map((f) => `<th scope="col">${esc(labels.get(f)!)}</th>`).join('')}</tr></thead>`
+  const volumes: string[] = plan.pages.length ? ['成員名錄'] : []
+  const pages = plan.pages.map((pg, i) => {
+    const rows = pg.rows.map((row) => `<tr data-member-id="${esc(row.id)}">${plan.fields.map((f) => {
+      const value = row.values[f] || '—'
+      return `<td title="${esc(value)}">${esc(value)}</td>`
+    }).join('')}</tr>`).join('')
+    return `<section class="page p1-page"><div class="running">${esc(meta.name)}${meta.hall ? ' · ' + esc(meta.hall) : ''} · 成员名录</div>
+      <div class="vol-title">成员名录${plan.pages.length > 1 ? ` · 第${i + 1}页` : ''}</div>
+      <table class="roster">${colgroup}${head}<tbody>${rows}</tbody></table>
+      <p class="note">一行一人 · 共 ${members.length} 人 · 空值以「—」標示</p>${p1Folio(folioOffset + i + 1)}</section>`
+  })
+  if (!pages.length) pages.push(`<section class="page p1-page"><div class="running">${esc(meta.name)} · 成员名录</div><div class="vol-title">成员名录</div><p class="note">所選範圍內暫無成員</p>${p1Folio(folioOffset + 1)}</section>`)
+  return { html: pages.join(''), volumes }
+}
+
 export interface PrintResult { html: string; summary: string; volumes: string[] }
 
 export function buildPrintHtml(
@@ -329,8 +649,11 @@ export function buildPrintHtml(
 
   let main: { html: string; volumes: string[] }
   let layoutName: string
+  const folioOffset = (opts.cover ? 1 : 0) + (opts.toc ? 1 : 0) + (opts.zibeiPage ? 1 : 0)
   if (opts.layout === 'baota') { main = baotaHtml(data, meta, scope, opts, gensPerPage, forPreview); layoutName = '寶塔式弔線圖' }
   else if (opts.layout === 'oushi') { main = oushiHtml(data, meta, scope, branches); layoutName = '歐式橫表·五世一表' }
+  else if (opts.layout === 'biography') { main = biographyHtml(data, meta, branches, filtered, opts, folioOffset); layoutName = '人物傳記式' }
+  else if (opts.layout === 'roster') { main = rosterHtml(data, meta, branches, zibei, filtered, opts, folioOffset); layoutName = '名錄簡表式' }
   else { main = sushiHtml(data, meta, scope, opts, colsPerPage, namesPerCol); layoutName = '蘇式垂珠體·豎排' }
 
   const sections: string[] = []
@@ -352,7 +675,8 @@ export function buildPrintHtml(
   const sc = opts.scope
   const scopeDesc = sc.kind === 'all' ? '整譜'
     : sc.kind === 'branch' ? (branches.find((b) => b.id === sc.branchId)?.name ?? '支系')
-      : `${gen(sc.from)}至${gen(sc.to)}`
+      : sc.kind === 'members' ? '勾選成員'
+        : `${gen(sc.from)}至${gen(sc.to)}`
   const summary = `${layoutName} · ${scopeDesc} ${filtered.length} 人 · ${opts.paper} ${opts.landscape ? '橫向' : '縱向'} · ${main.volumes.length} 卷`
   const html = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>${esc(meta.name)}</title><style>${baseCss(opts, forPreview)}</style></head><body>${sections.join('')}</body></html>`
   return { html, summary, volumes: main.volumes }

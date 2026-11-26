@@ -1,9 +1,10 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { PDFDocument, rgb, degrees, pushGraphicsState, popGraphicsState, setStrokingRgbColor, setLineWidth, setDashPattern, moveTo, lineTo, appendBezierCurve, stroke, rectangle, clip, endPath, type PDFOperator, type PDFPage, type PDFFont, type RGB } from 'pdf-lib'
+import { PDFDocument, rgb, degrees, pushGraphicsState, popGraphicsState, setStrokingRgbColor, setLineWidth, setDashPattern, moveTo, lineTo, appendBezierCurve, stroke, rectangle, clip, endPath, type PDFOperator, type PDFPage, type PDFFont, type PDFImage, type RGB } from 'pdf-lib'
 import fontkit from '@pdf-lib/fontkit'
 import type { Branch, GenealogyMeta, GraphData, Member, ZibeiPoem } from '../shared/types'
-import type { PrintOptions, Scope } from '../../src/print/build'
+import type { PrintOptions, BiographyPagePlan, RosterPlan } from '../../src/print/build'
+import { p1Metrics, planBiographyPages, planRosterPages, rosterColumnWidths, scopeIds, scopeMembers, ROSTER_FIELD_DEFS } from '../../src/print/build'
 import { buildTree, computeLayout, NODE_H, LEVEL_H } from '../../src/graph/layout'
 import { yearOf } from '../shared/lunar'
 
@@ -13,6 +14,8 @@ export interface PdfPayload {
   branches: Branch[]
   zibei: ZibeiPoem[]
   opts: PrintOptions
+  /** Current genealogy directory; supplied by the renderer for local portrait photos. */
+  photoDir?: string
 }
 
 const MM = 72 / 25.4
@@ -45,27 +48,6 @@ function years(m: Member): string {
   if (b && d) return `${b}–${d}`
   if (b) return m.alive ? `${b}–` : `${b}–？`
   return `？–${d}`
-}
-
-function branchSubtree(branches: Branch[], rootId: string): Set<string> {
-  const children = new Map<string, string[]>()
-  for (const b of branches) if (b.parentId) {
-    if (!children.has(b.parentId)) children.set(b.parentId, [])
-    children.get(b.parentId)!.push(b.id)
-  }
-  const out = new Set<string>()
-  const stack = [rootId]
-  while (stack.length) { const c = stack.pop()!; out.add(c); stack.push(...(children.get(c) ?? [])) }
-  return out
-}
-
-function scopeIds(data: GraphData, branches: Branch[], scope: Scope): Set<string> | undefined {
-  if (scope.kind === 'all') return undefined
-  if (scope.kind === 'branch') {
-    const bs = branchSubtree(branches, scope.branchId)
-    return new Set(data.members.filter((m) => m.branchId && bs.has(m.branchId)).map((m) => m.id))
-  }
-  return new Set(data.members.filter((m) => m.generation >= scope.from && m.generation <= scope.to).map((m) => m.id))
 }
 
 function extractTtf(buf: Buffer): Buffer {
@@ -130,6 +112,7 @@ class Painter {
     this.page.drawRectangle({ x: 0, y: 0, width: this.pw, height: this.ph, color: PAPER })
   }
   w(s: string, size: number): number { return this.font.widthOfTextAtSize(s, size) }
+  pageCount(): number { return this.doc.getPageCount() }
   base(s: string, x: number, baselineTop: number, size: number, color: RGB): void {
     if (!s) return
     this.page.drawText(s, { x, y: this.ph - baselineTop, size, font: this.font, color })
@@ -163,6 +146,11 @@ class Painter {
       borderColor: o.stroke, color: o.fill, borderWidth: o.width ?? 0.7,
       borderDashArray: o.dash, rotate: o.rotate === undefined ? undefined : degrees(o.rotate),
     })
+  }
+  image(img: PDFImage, x: number, top: number, maxW: number, maxH: number): void {
+    const scale = Math.min(maxW / img.width, maxH / img.height)
+    const w = img.width * scale, h = img.height * scale
+    this.page.drawImage(img, { x: x + (maxW - w) / 2, y: this.ph - top - (maxH + h) / 2, width: w, height: h })
   }
   svgPath(d: string, tx: number, ty: number, s: number, color: RGB, width: number, dash?: number[]): void {
     const tok = d.match(/[MVHC]|-?\d*\.?\d+/g) ?? []
@@ -540,6 +528,173 @@ function sushiDraw(p: Painter, meta: GenealogyMeta, pages: SushiPage[], pt: numb
   }
 }
 
+function p1Head(p: Painter, meta: GenealogyMeta, title: string, subtitle: string, pt: number): number {
+  const top = MARGIN
+  const running = `${meta.name}${meta.hall ? ' · ' + meta.hall : ''} · ${subtitle}`.replace(/\s+/g, ' ')
+  p.center(running, p.pw / 2, top, pt - 2, MUTED)
+  const lineTop = top + (pt - 2) * PT_MM * MM * 1.5 + 3 * MM
+  p.hline(MARGIN, p.pw - MARGIN, lineTop, LINE)
+  p.center(title.replace(/\s+/g, ' '), p.pw / 2, lineTop + 7 * MM, pt + 3, INK)
+  // Keep the same content origin as the explicit HTML page plan.
+  const runningH = (pt - 2) * PT_MM * MM * 1.5 + 3 * MM + 0.25 * MM
+  return top + runningH + 7 * MM + (pt + 3) * PT_MM * MM * 1.5 + 5 * MM
+}
+
+function p1Folio(p: Painter, no: number, pt: number): void {
+  p.center(String(no), p.pw / 2, p.ph - MARGIN - 4 * MM, pt - 2, MUTED)
+}
+
+function truncatePdf(s: string, maxW: number, size: number, font: PDFFont): string {
+  const text = s.replace(/\s+/g, ' ').trim()
+  if (font.widthOfTextAtSize(text, size) <= maxW) return text
+  const chars = Array.from(text)
+  while (chars.length && font.widthOfTextAtSize(chars.join('') + '…', size) > maxW) chars.pop()
+  return chars.join('') + '…'
+}
+
+async function trustedPortraitDir(payload: PdfPayload): Promise<string | undefined> {
+  let electron: typeof import('electron') | null = null
+  try { electron = await import('electron') } catch { return payload.photoDir }
+  // Plain Node tests do not have Electron's app object; production derives the
+  // current genealogy directory from persisted settings instead of trusting IPC.
+  if (!electron.app?.getPath) return payload.photoDir
+  try {
+    const userData = electron.app.getPath('userData')
+    let dataDir = path.join(userData, 'genealogies')
+    try {
+      const config = JSON.parse(fs.readFileSync(path.join(userData, 'config.json'), 'utf8')) as { dataDir?: string }
+      if (config.dataDir) dataDir = path.resolve(config.dataDir)
+    } catch { /* DataStore uses the same default for a missing/invalid config. */ }
+    const id = payload.meta.id
+    if (!id || id !== path.basename(id) || /[\\/]/.test(id)) return undefined
+    const expected = path.resolve(dataDir, id)
+    return expected
+  } catch { return undefined }
+}
+
+function portraitFile(photoDir: string | undefined, relPath: string): string | null {
+  if (!photoDir || !relPath) return null
+  try {
+    const root = path.resolve(photoDir)
+    const photos = path.resolve(root, 'photos')
+    const full = path.resolve(root, relPath)
+    if (!full.startsWith(photos + path.sep)) return null
+    const stat = fs.statSync(full)
+    if (!stat.isFile() || stat.size > 40 * 1024 * 1024) return null
+    return full
+  } catch { return null }
+}
+
+async function embedPortrait(doc: PDFDocument, file: string): Promise<PDFImage | null> {
+  try {
+    const bytes = fs.readFileSync(file)
+    const ext = path.extname(file).toLowerCase()
+    if (ext === '.jpg' || ext === '.jpeg') return await doc.embedJpg(bytes)
+    if (ext === '.png') return await doc.embedPng(bytes)
+    // Electron's decoder covers the other formats accepted by photo upload.
+    const { nativeImage } = await import('electron')
+    const image = nativeImage.createFromBuffer(bytes)
+    if (image.isEmpty()) return null
+    return await doc.embedPng(image.toPNG())
+  } catch { return null }
+}
+
+async function loadPortraits(doc: PDFDocument, payload: PdfPayload, members: Member[]): Promise<Map<string, PDFImage>> {
+  const out = new Map<string, PDFImage>()
+  const photoDir = await trustedPortraitDir(payload)
+  if (!photoDir) return out
+  for (const m of members) {
+    if (!m.photoPath || out.has(m.id)) continue
+    const file = portraitFile(photoDir, m.photoPath)
+    if (!file) continue
+    const image = await embedPortrait(doc, file)
+    if (image) out.set(m.id, image)
+  }
+  return out
+}
+
+async function biographyDraw(p: Painter, payload: PdfPayload, pages: BiographyPagePlan[], pt: number, cw: number, portraits: Map<string, PDFImage>): Promise<void> {
+  const metrics = p1Metrics(payload.opts)
+  const lineH = metrics.lineH * MM
+  const photoW = metrics.photoW * MM, photoH = metrics.photoH * MM
+  for (const pg of pages) {
+    p.newPage()
+    const title = `${pg.memberName}传${pg.continuation ? '（续）' : ''}`
+    let top = p1Head(p, payload.meta, title, '人物传记', pt)
+    const layoutTop = top
+    if (pg.photo) {
+      const x = MARGIN + cw - photoW
+      p.rect(x, top, photoW, photoH, { stroke: LINE })
+      const image = portraits.get(pg.memberId)
+      if (image) p.image(image, x, top, photoW, photoH)
+    }
+    for (const line of pg.profile) {
+      p.text(line, MARGIN, top, pt, INK)
+      top += lineH
+    }
+    top = layoutTop + Math.max(pg.profile.length * lineH, pg.photo ? photoH : 0) + (pg.profile.length || pg.photo ? 2 * MM : 0)
+    for (const line of pg.body) {
+      if (line.section) p.text(line.text, MARGIN, top, pt, ACCENT)
+      else if (line.text) p.text(line.text, MARGIN + 2 * pt * PT_MM * MM, top, pt, INK)
+      top += lineH
+    }
+    p1Folio(p, p.pageCount(), pt)
+  }
+  if (!pages.length) {
+    p.newPage()
+    const top = p1Head(p, payload.meta, '人物传记', '人物传记', pt)
+    note(p, '所選範圍內暫無成員', pt, top)
+    p1Folio(p, p.pageCount(), pt)
+  }
+}
+
+function rosterDraw(p: Painter, payload: PdfPayload, plan: RosterPlan, pt: number, cw: number, font: PDFFont, folioOffset: number, total: number): void {
+  const metrics = p1Metrics(payload.opts)
+  const widths = rosterColumnWidths(plan.fields, cw / MM).map((w) => w * MM)
+  const labels = new Map(ROSTER_FIELD_DEFS.map((f) => [f.key, f.label]))
+  if (!plan.pages.length) {
+    p.newPage()
+    const top = p1Head(p, payload.meta, '成员名录', '成员名录', pt)
+    note(p, '所選範圍內暫無成員', pt, top)
+    p1Folio(p, folioOffset + 1, pt)
+    return
+  }
+  plan.pages.forEach((pg, pageIndex) => {
+    p.newPage()
+    const title = `成员名录${plan.pages.length > 1 ? ` · 第${pageIndex + 1}页` : ''}`
+    let top = p1Head(p, payload.meta, title, '成员名录', pt)
+    const headH = plan.headerH * MM
+    let x = MARGIN
+    plan.fields.forEach((field, i) => {
+      p.rect(x, top, widths[i], headH, { stroke: LINE, fill: HEAD_FILL })
+      p.center(labels.get(field)!, x + widths[i] / 2, top + 2 * MM, pt, INK)
+      x += widths[i]
+    })
+    top += headH
+    const rowH = plan.rowH * MM
+    for (const row of pg.rows) {
+      let cx = MARGIN
+      plan.fields.forEach((field, i) => {
+        p.rect(cx, top, widths[i], rowH, { stroke: LINE })
+        const value = truncatePdf(row.values[field] || '—', widths[i] - 2.4 * MM, pt - 1, font)
+        p.text(value, cx + 1.2 * MM, top + (rowH - (pt - 1) * PT_MM * MM) / 2, pt - 1, INK)
+        cx += widths[i]
+      })
+      top += rowH
+    }
+    note(p, `一行一人 · 共 ${total} 人 · 空值以「—」標示`, pt, p.ph - MARGIN - 8 * MM)
+    p1Folio(p, folioOffset + pageIndex + 1, pt)
+  })
+}
+
+function layoutLabel(layout: PrintOptions['layout']): string {
+  if (layout === 'baota') return '寶塔式弔線圖'
+  if (layout === 'oushi') return '歐式橫表·五世一表'
+  if (layout === 'biography') return '人物傳記式'
+  if (layout === 'roster') return '名錄簡表式'
+  return '蘇式垂珠體·豎排'
+}
+
 export async function buildPdf(payload: PdfPayload): Promise<Uint8Array> {
   const { data, meta, branches, zibei, opts } = payload
   const [w, h] = PAPER_MM[opts.paper]
@@ -548,7 +703,8 @@ export async function buildPdf(payload: PdfPayload): Promise<Uint8Array> {
   const cw = pw - 2 * MARGIN, ch = ph - 2 * MARGIN
   const pt = FONT_PT[opts.fontSize]
   const scope = scopeIds(data, branches, opts.scope)
-  const filtered = scope ? data.members.filter((m) => scope.has(m.id)) : data.members
+  const filtered = scopeMembers(data, branches, opts.scope)
+  const folioOffset = (opts.cover ? 1 : 0) + (opts.toc ? 1 : 0) + (opts.zibeiPage ? 1 : 0)
 
   const doc = await PDFDocument.create()
   doc.registerFontkit(fontkit)
@@ -560,10 +716,23 @@ export async function buildPdf(payload: PdfPayload): Promise<Uint8Array> {
   const colsPerPage = Math.max(4, Math.floor((pw / MM - 28) / 22))
   const namesPerCol = Math.max(3, Math.floor((ph / MM - 56) / perNameMm))
 
-  let mainPages: number
+  let mainPages = 0
   let volumes: { label: string; first: number }[] = []
-  let drawMain: () => void
-  if (opts.layout === 'oushi') {
+  let drawMain: () => void | Promise<void> = () => {}
+  if (opts.layout === 'biography') {
+    const pages = planBiographyPages(data, branches, filtered, opts)
+    mainPages = Math.max(1, pages.length)
+    volumes = pages.length ? [{ label: '人物傳記', first: 0 }] : []
+    drawMain = async () => {
+      const portraits = await loadPortraits(doc, payload, filtered)
+      await biographyDraw(p, payload, pages, pt, cw, portraits)
+    }
+  } else if (opts.layout === 'roster') {
+    const plan = planRosterPages(data, branches, zibei, filtered, opts)
+    mainPages = Math.max(1, plan.pages.length)
+    volumes = plan.pages.length ? [{ label: '成員名錄', first: 0 }] : []
+    drawMain = () => rosterDraw(p, payload, plan, pt, cw, font, folioOffset, filtered.length)
+  } else if (opts.layout === 'oushi') {
     const headH = (pt - 2) * PT_MM * MM + 8 * MM + (pt + 3) * PT_MM * MM + 5 * MM + 8 * MM
     const plans = oushiPlan(data, scope, pt, cw, ch - headH - 10 * MM, font)
     mainPages = plans.reduce((s, x) => s + x.pages.length, 0)
@@ -578,7 +747,7 @@ export async function buildPdf(payload: PdfPayload): Promise<Uint8Array> {
       if (x.segIdx === 0) volumes.push({ label: `${gen(x.g0)}至${gen(x.g1)}`, first: i })
     })
     drawMain = () => baotaDraw(p, meta, layout, pages, pt, cw, ch)
-  } else {
+  } else if (opts.layout === 'sushi') {
     const pages = sushiPages(data, scope, pt, pw, ph, colsPerPage, namesPerCol, font)
     mainPages = pages.length
     let acc = 0
@@ -591,13 +760,13 @@ export async function buildPdf(payload: PdfPayload): Promise<Uint8Array> {
   if (opts.cover) cover(p, meta, pt)
   if (opts.toc) {
     const items: { t: string; no: number }[] = []
-    const layoutName = opts.layout === 'baota' ? '寶塔式弔線圖' : opts.layout === 'oushi' ? '歐式橫表·五世一表' : '蘇式垂珠體·豎排'
+    const layoutName = layoutLabel(opts.layout)
     if (opts.zibeiPage) items.push({ t: '字輩對照頁', no: base + 1 })
     volumes.forEach((v, i) => items.push({ t: `${layoutName} · 卷${CN[i] ?? i + 1}（${v.label}）`, no: mainStart + v.first }))
     toc(p, meta, items, filtered.length, volumes.length, pt)
   }
   if (opts.zibeiPage) zibeiDraw(p, meta, zibei, pt)
-  drawMain()
+  await drawMain()
   if (!mainPages) { p.newPage(); note(p, '所選範圍內暫無成員', pt, ph / 2) }
   return doc.save()
 }

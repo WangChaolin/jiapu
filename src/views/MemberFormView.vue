@@ -7,6 +7,7 @@ import { isValidSolar } from '@shared/lunar'
 import { PARENT_SUBTYPES, SPOUSE_SUBTYPES, type Branch, Member, MemberDetail, ParentSubtype, SpouseSubtype, ZibeiPoem } from '@shared/types'
 import DateField from '../components/DateField.vue'
 import MemberPicker from '../components/MemberPicker.vue'
+import ExcelImportPanel from '../components/ExcelImportPanel.vue'
 
 interface ParentRow { otherId: string | null; subtype: ParentSubtype; isPrimary: boolean; note: string }
 interface SpouseRow { otherId: string | null; subtype: SpouseSubtype; note: string }
@@ -18,11 +19,12 @@ const existing = ref<MemberDetail | null>(null)
 const relTab = ref<'parents' | 'spouses' | 'children'>('parents')
 const busy = ref(false)
 const genManual = ref(false)
+const entryMode = ref<'manual' | 'excel'>('manual')
 
 const form = reactive({
   name: '', gender: '男' as Member['gender'], generation: 1, branchId: '' as string,
   birthDate: '', birthLunar: false, deathDate: '', deathLunar: false, alive: true,
-  birthOrder: 1, courtesyName: '', title: '', occupation: '', residence: '', burial: '', biography: '', photoPath: '',
+  birthOrder: 1, courtesyName: '', title: '', occupation: '', residence: '', burial: '', biography: '', remark: '', photoPath: '',
 })
 const parents = ref<ParentRow[]>([])
 const spouses = ref<SpouseRow[]>([])
@@ -77,7 +79,7 @@ function buildInput(): Parameters<typeof api.member.create>[0] {
     branchId: form.branchId || null, birthDate: form.birthDate, birthLunar: form.birthLunar,
     deathDate: form.deathDate, deathLunar: form.deathLunar, alive: form.alive, birthOrder: form.birthOrder,
     courtesyName: form.courtesyName, title: form.title, occupation: form.occupation,
-    residence: form.residence, burial: form.burial, biography: form.biography, photoPath: form.photoPath,
+    residence: form.residence, burial: form.burial, biography: form.biography, remark: form.remark, photoPath: form.photoPath,
     parents: parents.value.filter((p) => p.otherId).map((p) => ({ otherId: p.otherId!, subtype: p.subtype, isPrimary: p.isPrimary, note: p.note })),
     spouses: spouses.value.filter((s) => s.otherId).map((s) => ({ otherId: s.otherId!, subtype: s.subtype, note: s.note })),
   }
@@ -109,9 +111,15 @@ function resetForm(): void {
   Object.assign(form, {
     name: '', gender: '男', generation: 1, branchId: '', birthDate: '', birthLunar: false,
     deathDate: '', deathLunar: false, alive: true, birthOrder: 1, courtesyName: '', title: '',
-    occupation: '', residence: '', burial: '', biography: '', photoPath: '',
+    occupation: '', residence: '', burial: '', biography: '', remark: '', photoPath: '',
   })
   parents.value = []; spouses.value = []; genManual.value = false; existing.value = null
+}
+
+async function onImported(): Promise<void> {
+  await refreshStats(); bump()
+  allMembers.value = (await api.member.list({ limit: 100000 })).rows
+  branches.value = await api.branch.list()
 }
 
 function addChild(): void {
@@ -134,7 +142,7 @@ onMounted(async () => {
         name: d.name, gender: d.gender, generation: d.generation, branchId: d.branchId ?? '',
         birthDate: d.birthDate, birthLunar: d.birthLunar, deathDate: d.deathDate, deathLunar: d.deathLunar,
         alive: d.alive, birthOrder: d.birthOrder, courtesyName: d.courtesyName, title: d.title,
-        occupation: d.occupation, residence: d.residence, burial: d.burial, biography: d.biography, photoPath: d.photoPath,
+        occupation: d.occupation, residence: d.residence, burial: d.burial, biography: d.biography, remark: d.remark, photoPath: d.photoPath,
       })
       parents.value = d.parents.map((p) => ({ otherId: p.otherId, subtype: p.subtype as ParentSubtype, isPrimary: p.isPrimary, note: p.note }))
       spouses.value = d.spouses.map((s) => ({ otherId: s.otherId, subtype: s.subtype as SpouseSubtype, note: s.note }))
@@ -153,9 +161,14 @@ onMounted(async () => {
   <div>
     <div class="jp-page-head">
       <h2 class="jp-page-title jp-serif-c">{{ isEdit ? '编辑成员' : '成员录入' }}</h2>
-      <span class="jp-muted">男女平等录入，女性成员可延续世系 · 支持特殊关系与农历</span>
+      <div v-if="!isEdit" class="jp-tabs" style="margin:0 0 0 8px">
+        <button :aria-pressed="entryMode === 'manual'" @click="entryMode = 'manual'">手动录入</button>
+        <button :aria-pressed="entryMode === 'excel'" @click="entryMode = 'excel'">Excel 导入</button>
+      </div>
+      <span class="jp-muted">{{ isEdit || entryMode === 'manual' ? '男女平等录入，女性成员可延续世系 · 支持特殊关系与农历' : '批量导入成员基本信息 · 自动校验 · 支持整批撤销' }}</span>
     </div>
-    <div class="jp-form-grid">
+    <ExcelImportPanel v-if="!isEdit && entryMode === 'excel'" @imported="onImported" @view-members="setPage('members')" />
+    <div v-show="isEdit || entryMode === 'manual'" class="jp-form-grid">
       <div class="jp-panel">
         <div class="jp-panel-title">基本信息</div>
         <div class="jp-form-row">
@@ -204,6 +217,7 @@ onMounted(async () => {
           <div class="jp-field"><span>葬地</span><input v-model="form.burial" type="text" aria-label="葬地"></div>
         </div>
         <div class="jp-field"><span>生平简介</span><textarea v-model="form.biography" rows="3" placeholder="生平事迹、迁徙、职业、功名等" aria-label="生平简介"></textarea></div>
+        <div class="jp-field"><span>备注</span><textarea v-model="form.remark" rows="2" placeholder="补充说明、待考证信息等" aria-label="备注"></textarea></div>
       </div>
 
       <div class="jp-panel">

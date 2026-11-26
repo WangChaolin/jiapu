@@ -193,6 +193,8 @@ test('批量详情与单条详情一致且保序', () => {
   assert.equal(batch[0].parents.length, 3)
   assert.equal(batch[0].parents.find((p) => p.subtype === '兼祧父')!.isPrimary, false)
   assert.equal(batch[2].children.length, 1)
+  assert.equal(batch[2].children[0].otherName, '张心明')
+  assert.equal(batch[2].children[0].otherGender, '男')
   assert.equal(batch[2].spouses[0].otherName, '陈玉梅')
   assert.deepEqual(db.getMembersDetails([]), [])
   db.deleteMember(u.id)

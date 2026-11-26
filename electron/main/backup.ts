@@ -181,7 +181,7 @@ export function importJson(db: GenealogyDb, json: string): number {
     id: string; name: string; gender: '男' | '女' | '其他'; generation: number; branchId: string | null
     birthDate?: string; birthLunar?: boolean; deathDate?: string; deathLunar?: boolean; alive?: boolean
     birthOrder?: number; courtesyName?: string; title?: string; occupation?: string; residence?: string
-    burial?: string; biography?: string
+    burial?: string; biography?: string; remark?: string
   }[]
   for (const m of rawMembers) {
     const created = db.createMember({
@@ -189,7 +189,7 @@ export function importJson(db: GenealogyDb, json: string): number {
       branchId: m.branchId ? (branchMap.get(m.branchId) ?? null) : null,
       birthDate: m.birthDate, birthLunar: m.birthLunar, deathDate: m.deathDate, deathLunar: m.deathLunar,
       alive: m.alive, birthOrder: m.birthOrder, courtesyName: m.courtesyName, title: m.title,
-      occupation: m.occupation, residence: m.residence, burial: m.burial, biography: m.biography,
+      occupation: m.occupation, residence: m.residence, burial: m.burial, biography: m.biography, remark: m.remark,
     })
     idMap.set(m.id, created.id)
   }

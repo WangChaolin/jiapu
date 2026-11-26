@@ -8,7 +8,20 @@ import {
 } from './backup.ts'
 import { seedDemo } from './seed.ts'
 import { buildPdf, type PdfPayload } from './pdf.ts'
-import type { AppSettings, MemberFilter, MemberInput } from '../shared/types'
+import { renderGraphPng } from './graph-png.ts'
+import {
+  analyzeWorkbook, batchSummary, commitWorkbook, createIssueReport, createTemplate,
+} from './excel.ts'
+import {
+  analyzeGedcom, commitGedcom, exportGedcom, gedcomExportPreview,
+} from './gedcom.ts'
+import iconv from 'iconv-lite'
+import type {
+  AppSettings, BranchOperation, BranchOperationPreview, BranchOperationResult, DuplicateMemberGroup,
+  ExcelAnalyzeOptions, ExcelIssue, ExcelPreview, GedcomAnalyzeOptions, GedcomExportOptions,
+  GedcomExportSaveResult, GedcomPreview, GenealogyMeta, GraphData, GraphPngOptions,
+  MemberFilter, MemberInput, MemberMergeRequest, MemberMergeResult,
+} from '../shared/types'
 
 export function registerPhotoProtocol(store: DataStore): void {
   protocol.handle('jpimg', (request) => {
@@ -102,6 +115,9 @@ export function registerIpc(store: DataStore, getWin: () => BrowserWindow | null
   ipcMain.handle('member:delete', (_e, id: string) => store.current().deleteMember(id))
   ipcMain.handle('member:restore', (_e, id: string) => store.current().restoreMember(id))
   ipcMain.handle('member:generations', () => store.current().generations())
+  ipcMain.handle('member:duplicates', () => store.current().findDuplicateMembers())
+  ipcMain.handle('member:merge', (_e, request: MemberMergeRequest) => store.current().mergeMembers(request))
+  ipcMain.handle('operation:undo', (_e, id: string) => store.current().undoOperation(id))
   ipcMain.handle('member:recommendedChar', (_e, generation: number, branchId: string | null) =>
     store.current().recommendedChar(generation, branchId))
   ipcMain.handle('member:choosePhoto', async () => {
@@ -119,6 +135,18 @@ export function registerIpc(store: DataStore, getWin: () => BrowserWindow | null
 
   // ---------- graph ----------
   ipcMain.handle('graph:data', () => store.current().graph())
+  ipcMain.handle('graph:savePng', async (_e, payload: { data: GraphData; meta: GenealogyMeta; opts: GraphPngOptions }, defaultName: string) => {
+    const meta = store.currentMeta()
+    if (!meta || meta.id !== payload.meta.id) throw new Error('家谱状态已变化，请刷新图谱后重试')
+    const r = await dialog.showSaveDialog(getWin()!, {
+      title: '导出关系图谱 PNG', defaultPath: defaultName,
+      filters: [{ name: 'PNG 图片', extensions: ['png'] }],
+    })
+    if (r.canceled || !r.filePath) return null
+    const png = await renderGraphPng(payload.data, payload.meta, payload.opts)
+    fs.writeFileSync(r.filePath, png)
+    return r.filePath
+  })
 
   // ---------- zibei ----------
   ipcMain.handle('zibei:list', () => store.current().listZibei())
@@ -138,6 +166,11 @@ export function registerIpc(store: DataStore, getWin: () => BrowserWindow | null
   ipcMain.handle('branch:delete', (_e, id: string) => {
     store.current().deleteBranch(id)
     return store.current().listBranches()
+  })
+  ipcMain.handle('branch:preview', (_e, request: BranchOperation) => store.current().previewBranchOperation(request))
+  ipcMain.handle('branch:operate', (_e, request: BranchOperation) => {
+    const result = store.current().runBranchOperation(request)
+    return { ...result, branches: store.current().listBranches() }
   })
 
   // ---------- backup ----------
@@ -221,6 +254,157 @@ export function registerIpc(store: DataStore, getWin: () => BrowserWindow | null
       store.deleteGenealogy(created.id)
       return { ok: false, message: (e as Error).message }
     }
+  })
+
+  // ---------- Excel import ----------
+  ipcMain.handle('excel:template', async () => {
+    const meta = store.currentMeta()
+    if (!meta) throw new Error('尚未打开家谱')
+    const r = await dialog.showSaveDialog(getWin()!, {
+      title: '下载成员导入模板', defaultPath: `${meta.name}-成员导入模板.xlsx`,
+      filters: [{ name: 'Excel 工作簿', extensions: ['xlsx'] }],
+    })
+    if (r.canceled || !r.filePath) return null
+    fs.writeFileSync(r.filePath, await createTemplate())
+    return r.filePath
+  })
+  ipcMain.handle('excel:choose', async () => {
+    const r = await dialog.showOpenDialog(getWin()!, {
+      title: '选择成员 Excel 文件', properties: ['openFile'],
+      filters: [{ name: 'Excel 工作簿', extensions: ['xlsx'] }],
+    })
+    return r.canceled ? null : r.filePaths[0]
+  })
+  ipcMain.handle('excel:analyze', (_e, file: string, options: ExcelAnalyzeOptions) =>
+    analyzeWorkbook(store.current(), file, options))
+  ipcMain.handle('excel:commit', (_e, file: string, options: ExcelAnalyzeOptions, expectedHash: string) =>
+    commitWorkbook(store.current(), file, options, expectedHash))
+  ipcMain.handle('excel:saveReport', async (_e, report: ExcelPreview | { batchId: string }) => {
+    let name = '成员导入报告'
+    let issues: ExcelIssue[]
+    let summary: { totalRows: number; successCount: number; skippedCount: number; failedCount: number } | undefined
+    if ('batchId' in report) {
+      const batch = store.current().listImportBatches().find((b) => b.id === report.batchId)
+      if (!batch) throw new Error('导入批次不存在')
+      name = batch.sourceName
+      issues = store.current().importIssues(batch.id)
+      summary = batchSummary(batch)
+    } else {
+      name = report.fileName
+      issues = report.issues
+      summary = {
+        totalRows: report.totalRows,
+        successCount: report.validRows,
+        skippedCount: Math.max(0, report.totalRows - report.validRows - report.errorRows),
+        failedCount: report.errorRows,
+      }
+    }
+    const r = await dialog.showSaveDialog(getWin()!, {
+      title: '导出导入问题报告', defaultPath: `${name.replace(/\.xlsx$/i, '')}-导入报告.xlsx`,
+      filters: [{ name: 'Excel 工作簿', extensions: ['xlsx'] }],
+    })
+    if (r.canceled || !r.filePath) return null
+    fs.writeFileSync(r.filePath, await createIssueReport(name, issues, summary))
+    return r.filePath
+  })
+  ipcMain.handle('excel:batches', () => store.current().listImportBatches())
+  ipcMain.handle('excel:issues', (_e, batchId: string) => store.current().importIssues(batchId))
+  ipcMain.handle('excel:undo', (_e, batchId: string) => store.current().undoImport(batchId))
+
+  // ---------- GEDCOM ----------
+  ipcMain.handle('gedcom:choose', async () => {
+    const autoIn = process.env['JIAPU_GEDCOM_IN']
+    if (autoIn) return autoIn
+    const r = await dialog.showOpenDialog(getWin()!, {
+      title: '选择 GEDCOM 文件', properties: ['openFile'],
+      filters: [{ name: 'GEDCOM 家谱文件', extensions: ['ged'] }],
+    })
+    return r.canceled ? null : r.filePaths[0]
+  })
+  ipcMain.handle('gedcom:analyze', (_e, file: string, options: GedcomAnalyzeOptions) => {
+    const analysis = analyzeGedcom(store.current(), file, options)
+    return { preview: analysis.preview }
+  })
+  ipcMain.handle('gedcom:commit', (_e, file: string, options: GedcomAnalyzeOptions, expectedHash: string) => {
+    const genealogyId = store.currentId()
+    if (!genealogyId) throw new Error('尚未打开家谱')
+    return commitGedcom(store.current(), file, options, expectedHash, {
+      savePhoto: (sourcePath) => store.savePhoto(genealogyId, sourcePath),
+      deletePhoto: (relPath) => store.deletePhoto(genealogyId, relPath),
+    })
+  })
+  ipcMain.handle('gedcom:batches', () => store.current().listImportBatches().filter((b) => /\.ged$/i.test(b.sourceName)))
+  ipcMain.handle('gedcom:issues', (_e, batchId: string) => store.current().importIssues(batchId))
+  ipcMain.handle('gedcom:undo', (_e, batchId: string) => {
+    const genealogyId = store.currentId()
+    if (!genealogyId) throw new Error('尚未打开家谱')
+    const options = store.current().importBatchOptions(batchId)
+    const result = store.current().undoImport(batchId)
+    if (result.ok && Array.isArray(options.photoPaths)) {
+      for (const rel of options.photoPaths) if (typeof rel === 'string') store.deletePhoto(genealogyId, rel)
+    }
+    return result
+  })
+  ipcMain.handle('gedcom:saveReport', async (_e, report: GedcomPreview | { batchId: string }) => {
+    let name = 'GEDCOM 导入报告'
+    let issues: ExcelIssue[]
+    let summary: { totalRows: number; successCount: number; skippedCount: number; failedCount: number }
+    if ('batchId' in report) {
+      const batch = store.current().listImportBatches().find((b) => b.id === report.batchId)
+      if (!batch) throw new Error('导入批次不存在')
+      name = batch.sourceName
+      issues = store.current().importIssues(batch.id)
+      summary = batchSummary(batch)
+    } else {
+      name = report.fileName
+      issues = report.issues
+      summary = {
+        totalRows: report.individualCount,
+        successCount: report.validCount,
+        skippedCount: report.skippedCount,
+        failedCount: report.issues.filter((i) => i.level === 'error').length,
+      }
+    }
+    const r = await dialog.showSaveDialog(getWin()!, {
+      title: '导出 GEDCOM 导入报告', defaultPath: `${name.replace(/\.ged$/i, '')}-导入报告.xlsx`,
+      filters: [{ name: 'Excel 工作簿', extensions: ['xlsx'] }],
+    })
+    if (r.canceled || !r.filePath) return null
+    fs.writeFileSync(r.filePath, await createIssueReport(name, issues, summary))
+    return r.filePath
+  })
+  ipcMain.handle('gedcom:exportPreview', (_e, options: GedcomExportOptions) => {
+    const meta = store.currentMeta()
+    if (!meta) throw new Error('尚未打开家谱')
+    return gedcomExportPreview(store.current(), meta, options, version, store.genealogyDir(meta.id))
+  })
+  ipcMain.handle('gedcom:export', async (_e, options: GedcomExportOptions): Promise<GedcomExportSaveResult | null> => {
+    const meta = store.currentMeta()
+    if (!meta) throw new Error('尚未打开家谱')
+    const result = exportGedcom(store.current(), meta, options, version, store.genealogyDir(meta.id))
+    const autoOut = process.env['JIAPU_GEDCOM_OUT']
+    let filePath: string
+    if (autoOut) filePath = autoOut
+    else {
+      const r = await dialog.showSaveDialog(getWin()!, {
+        title: '导出 GEDCOM', defaultPath: `${meta.name}.ged`,
+        filters: [{ name: 'GEDCOM 家谱文件', extensions: ['ged'] }],
+      })
+      if (r.canceled || !r.filePath) return null
+      filePath = r.filePath
+    }
+    const bytes = options.encoding === 'gbk' ? iconv.encode(result.content, 'gbk') : Buffer.from(result.content, 'utf8')
+    fs.writeFileSync(filePath, bytes)
+    const copied: string[] = []
+    for (const photo of result.photos) {
+      const target = path.join(path.dirname(filePath), ...photo.targetRelative.split('/'))
+      try {
+        fs.mkdirSync(path.dirname(target), { recursive: true })
+        fs.copyFileSync(photo.sourcePath, target)
+        copied.push(photo.targetRelative)
+      } catch (e) { result.warnings.push(`照片复制失败：${photo.sourcePath}（${(e as Error).message}）`) }
+    }
+    return { filePath, photoCount: copied.length, warnings: result.warnings }
   })
 
   // ---------- PDF ----------

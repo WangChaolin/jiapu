@@ -1,4 +1,4 @@
-import type { GraphData, Member } from '@shared/types'
+import type { GraphData, GraphOrientation, Member } from '@shared/types'
 
 export const NODE_W = 94
 export const NODE_H = 42
@@ -140,7 +140,39 @@ export function buildTree(data: GraphData, scope?: Set<string>): Tree {
   return { members, byId, primaryParent, secondaryParents, childrenOf, spousePairs, spousesOf, roots }
 }
 
-export function computeLayout(data: GraphData, collapsed: Set<string>, scope?: Set<string>): Layout {
+function applyHiddenCounts(
+  nodes: LayoutNode[],
+  nodeMap: Map<string, LayoutNode>,
+  childrenOf: Map<string, string[]>,
+  spousesOf: Map<string, string[]>,
+): void {
+  for (const node of nodes) {
+    if (!node.collapsed) continue
+    const hidden = new Set<string>()
+    const stack = [...(childrenOf.get(node.id) ?? [])]
+    while (stack.length) {
+      const id = stack.pop()!
+      if (hidden.has(id)) continue
+      hidden.add(id)
+      stack.push(...(childrenOf.get(id) ?? []), ...(spousesOf.get(id) ?? []))
+    }
+    for (const id of nodeMap.keys()) hidden.delete(id)
+    node.hiddenCount = hidden.size
+  }
+}
+
+export function computeLayout(
+  data: GraphData,
+  collapsed: Set<string>,
+  scope?: Set<string>,
+  orientation: GraphOrientation = 'vertical',
+): Layout {
+  return orientation === 'horizontal'
+    ? computeHorizontalLayout(data, collapsed, scope)
+    : computeVerticalLayout(data, collapsed, scope)
+}
+
+function computeVerticalLayout(data: GraphData, collapsed: Set<string>, scope?: Set<string>): Layout {
   const { members, byId, primaryParent, secondaryParents, childrenOf, spousePairs, spousesOf, roots: allRoots } = buildTree(data, scope)
   const hasChildren = (id: string): boolean => (childrenOf.get(id)?.length ?? 0) > 0
   const sortSibs = (a: string, b: string): number => {
@@ -196,12 +228,6 @@ export function computeLayout(data: GraphData, collapsed: Set<string>, scope?: S
 
   const nodes: LayoutNode[] = []
   const nodeMap = new Map<string, LayoutNode>()
-  const hiddenCount = (id: string): number => {
-    let n = 0
-    const stack = [...(childrenOf.get(id) ?? [])]
-    while (stack.length) { const c = stack.pop()!; n++; stack.push(...(childrenOf.get(c) ?? [])) }
-    return n
-  }
   const place = (id: string, left: number): number => {
     const m = byId.get(id)!
     const kids = childrenOf.get(id) ?? []
@@ -222,7 +248,7 @@ export function computeLayout(data: GraphData, collapsed: Set<string>, scope?: S
     const y = (m.generation - minGen) * LEVEL_H + PAD
     const anchor: LayoutNode = {
       id, member: m, x: blockLeft, y, w: NODE_W, h: NODE_H, role: 'anchor',
-      collapsed: isCollapsed && kids.length > 0, hiddenCount: isCollapsed ? hiddenCount(id) : 0,
+      collapsed: isCollapsed && kids.length > 0, hiddenCount: 0,
       childCount: kids.length,
     }
     nodes.push(anchor); nodeMap.set(id, anchor)
@@ -237,6 +263,7 @@ export function computeLayout(data: GraphData, collapsed: Set<string>, scope?: S
   }
   let cursor = PAD
   for (const r of roots) { place(r, cursor); cursor += subtreeW.get(r)! + TREE_GAP }
+  applyHiddenCounts(nodes, nodeMap, childrenOf, spousesOf)
 
   const minX = nodes.length ? Math.min(...nodes.map((n) => n.x)) : 0
   const shift = PAD - minX
@@ -287,6 +314,155 @@ export function computeLayout(data: GraphData, collapsed: Set<string>, scope?: S
       const x2 = right.x + right.w / 2, y2 = right.y + NODE_H
       const dip = Math.max(y1, y2) + 16
       edges.push({ id: `sp-${e.id}`, kind: 'spouseCross', from: e.from, to: e.to, path: `M ${x1} ${y1} V ${dip} H ${x2} V ${y2}` })
+    }
+  }
+
+  return { nodes, edges, width, height, nodeMap }
+}
+
+const HORIZONTAL_LEVEL_GAP = NODE_W + 66
+
+function computeHorizontalLayout(data: GraphData, collapsed: Set<string>, scope?: Set<string>): Layout {
+  const { members, byId, primaryParent, secondaryParents, childrenOf, spousesOf, roots: allRoots } = buildTree(data, scope)
+  const hasChildren = (id: string): boolean => (childrenOf.get(id)?.length ?? 0) > 0
+
+  // Keep the same anchor/spouse pairing rules as the vertical tree. In the
+  // horizontal tree a couple is a vertical block, so its width is one node.
+  const attached = new Map<string, string[]>()
+  const isAttached = new Set<string>()
+  for (const m of members) {
+    if (isAttached.has(m.id)) continue
+    for (const other of spousesOf.get(m.id) ?? []) {
+      if (isAttached.has(other) || other === m.id) continue
+      const mBlood = primaryParent.has(m.id) || hasChildren(m.id)
+      const oBlood = primaryParent.has(other) || hasChildren(other)
+      let anchor: string | null = null, spouse: string | null = null
+      if (mBlood && !oBlood) { anchor = m.id; spouse = other }
+      else if (oBlood && !mBlood) { anchor = other; spouse = m.id }
+      else if (!mBlood && !oBlood) {
+        const om = byId.get(other)!
+        if (m.gender === '男' && om.gender !== '男') { anchor = m.id; spouse = other }
+        else if (om.gender === '男' && m.gender !== '男') { anchor = other; spouse = m.id }
+        else { anchor = m.id; spouse = other }
+      }
+      if (anchor && spouse && !isAttached.has(spouse) && !isAttached.has(anchor)) {
+        if (!attached.has(anchor)) attached.set(anchor, [])
+        attached.get(anchor)!.push(spouse)
+        isAttached.add(spouse)
+      }
+    }
+  }
+  const roots = allRoots.filter((id) => !isAttached.has(id))
+
+  const minGen = members.length ? Math.min(...members.map((m) => m.generation)) : 1
+  const blockH = (id: string): number => {
+    const n = 1 + (attached.get(id)?.length ?? 0)
+    return n * NODE_H + (n - 1) * COUPLE_GAP
+  }
+  const subtreeH = new Map<string, number>()
+  const measure = (id: string): number => {
+    const kids = childrenOf.get(id) ?? []
+    const bh = blockH(id)
+    if (collapsed.has(id) || kids.length === 0) { subtreeH.set(id, bh); return bh }
+    const total = kids.reduce((s, k) => s + measure(k), 0) + TREE_GAP * (kids.length - 1)
+    const h = Math.max(bh, total)
+    subtreeH.set(id, h)
+    return h
+  }
+  roots.forEach(measure)
+
+  const nodes: LayoutNode[] = []
+  const nodeMap = new Map<string, LayoutNode>()
+  const place = (id: string, top: number): number => {
+    const m = byId.get(id)!
+    const kids = childrenOf.get(id) ?? []
+    const bh = blockH(id)
+    const sh = subtreeH.get(id)!
+    let center: number
+    const isCollapsed = collapsed.has(id)
+    if (!isCollapsed && kids.length) {
+      const total = kids.reduce((s, k) => s + subtreeH.get(k)!, 0) + TREE_GAP * (kids.length - 1)
+      let childTop = top + (sh - total) / 2
+      const centers: number[] = []
+      for (const k of kids) {
+        centers.push(place(k, childTop))
+        childTop += subtreeH.get(k)! + TREE_GAP
+      }
+      center = (centers[0] + centers[centers.length - 1]) / 2
+    } else {
+      center = top + sh / 2
+    }
+    const blockTop = center - bh / 2
+    const x = (m.generation - minGen) * HORIZONTAL_LEVEL_GAP + PAD
+    const anchor: LayoutNode = {
+      id, member: m, x, y: blockTop, w: NODE_W, h: NODE_H, role: 'anchor',
+      collapsed: isCollapsed && kids.length > 0, hiddenCount: 0,
+      childCount: kids.length,
+    }
+    nodes.push(anchor)
+    nodeMap.set(id, anchor)
+    let sy = blockTop + NODE_H + COUPLE_GAP
+    for (const sp of attached.get(id) ?? []) {
+      const sm = byId.get(sp)!
+      const sn: LayoutNode = {
+        id: sp, member: sm, x, y: sy, w: NODE_W, h: NODE_H, role: 'spouse',
+        collapsed: false, hiddenCount: 0, childCount: childrenOf.get(sp)?.length ?? 0,
+      }
+      nodes.push(sn)
+      nodeMap.set(sp, sn)
+      sy += NODE_H + COUPLE_GAP
+    }
+    return center
+  }
+  let cursor = PAD
+  for (const r of roots) { place(r, cursor); cursor += subtreeH.get(r)! + TREE_GAP }
+  applyHiddenCounts(nodes, nodeMap, childrenOf, spousesOf)
+
+  const minY = nodes.length ? Math.min(...nodes.map((n) => n.y)) : 0
+  const shift = PAD - minY
+  for (const n of nodes) n.y += shift
+  const width = nodes.length ? Math.max(...nodes.map((n) => n.x + n.w)) + PAD : 200
+  const height = nodes.length ? Math.max(...nodes.map((n) => n.y + n.h)) + PAD : 200
+
+  const edges: LayoutEdge[] = []
+  const coupleCenterY = (id: string): number => nodeMap.get(id)!.y + blockH(id) / 2
+  for (const [child, parent] of primaryParent) {
+    const cn = nodeMap.get(child), pn = nodeMap.get(parent)
+    if (!cn || !pn || cn.collapsed) continue
+    const px = pn.x + NODE_W, py = coupleCenterY(parent)
+    const cx = cn.x, cy = cn.y + NODE_H / 2
+    const midX = (px + cx) / 2
+    edges.push({ id: `pe-${parent}-${child}`, kind: 'line', from: parent, to: child, path: `M ${px} ${py} H ${midX} V ${cy} H ${cx}` })
+  }
+  for (const [child, secs] of secondaryParents) {
+    const cn = nodeMap.get(child)
+    if (!cn || cn.collapsed) continue
+    for (const s of secs) {
+      const pn = nodeMap.get(s.from)
+      if (!pn) continue
+      const px = pn.x + NODE_W, py = pn.y + NODE_H / 2
+      const cx = cn.x, cy = cn.y + NODE_H / 2
+      edges.push({ id: `se-${s.id}`, kind: 'dashed', from: s.from, to: child, path: `M ${px} ${py} C ${px + 34} ${py}, ${cx - 34} ${cy}, ${cx} ${cy}` })
+    }
+  }
+  const drawnSpouse = new Set<string>()
+  for (const e of data.edges) {
+    if (e.type !== 'spouse' || drawnSpouse.has(e.id)) continue
+    drawnSpouse.add(e.id)
+    const a = nodeMap.get(e.from), b = nodeMap.get(e.to)
+    if (!a || !b) continue
+    const upper = a.y <= b.y ? a : b, lower = a.y <= b.y ? b : a
+    const sameColumn = Math.abs(a.x - b.x) < 2
+    const adjacent = sameColumn && Math.abs(lower.y - (upper.y + upper.h)) <= COUPLE_GAP + 1
+    if (adjacent) {
+      const x = upper.x + upper.w / 2
+      const y1 = upper.y + upper.h, y2 = lower.y
+      edges.push({ id: `sp-${e.id}`, kind: 'spouse', from: e.from, to: e.to, path: `M ${x - 2} ${y1} V ${y2} M ${x + 2} ${y1} V ${y2}` })
+    } else {
+      const x1 = a.x + a.w, y1 = a.y + NODE_H / 2
+      const x2 = b.x + b.w, y2 = b.y + NODE_H / 2
+      const detour = Math.max(x1, x2) + 16
+      edges.push({ id: `sp-${e.id}`, kind: 'spouseCross', from: e.from, to: e.to, path: `M ${x1} ${y1} H ${detour} V ${y2} H ${x2}` })
     }
   }
 

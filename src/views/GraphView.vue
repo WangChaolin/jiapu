@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref, reactive, computed, watch, onMounted, nextTick } from 'vue'
 import { api } from '../api'
-import { state, editMember, showMember, genName, toast } from '../store'
+import { state, editMember, showMember, genName, toast, run } from '../store'
 import { computeLayout, descendantSet, ancestorSet, NODE_W, NODE_H, type LayoutNode } from '../graph/layout'
 import { describeDate, yearOf } from '@shared/lunar'
-import type { GraphData, MemberDetail } from '@shared/types'
+import type { GraphData, GraphOrientation, GraphPngOptions, MemberDetail } from '@shared/types'
 
 const VB_W = 980, VB_H = 560
 const data = ref<GraphData>({ members: [], edges: [] })
@@ -14,6 +14,15 @@ const collapsed = reactive(new Set<string>())
 const tf = reactive({ x: 0, y: 0, k: 1 })
 const search = ref('')
 const detail = ref<MemberDetail | null>(null)
+const orientation = ref<GraphOrientation>('vertical')
+const showPng = ref(false)
+const pngBusy = ref(false)
+const pngScope = ref<GraphPngOptions['scope']>('viewport')
+const pngScale = ref<GraphPngOptions['scale']>(2)
+const pngBackground = ref<GraphPngOptions['background']>('rice')
+const pngLegend = ref(true)
+const pngTitle = ref(true)
+const pngTimestamp = ref(true)
 const svgEl = ref<SVGSVGElement | null>(null)
 const panning = ref(false)
 let panStart = { x: 0, y: 0, tx: 0, ty: 0 }
@@ -22,8 +31,22 @@ const scope = computed<Set<string> | undefined>(() => {
   if (view.value === 'all' || !focusId.value) return undefined
   return view.value === 'descendants' ? descendantSet(data.value, focusId.value) : ancestorSet(data.value, focusId.value)
 })
-const layout = computed(() => computeLayout(data.value, collapsed, scope.value))
+const layout = computed(() => computeLayout(data.value, collapsed, scope.value, orientation.value))
 const activeId = computed(() => focusId.value)
+const visibleIds = computed(() => layout.value.nodes.map((n) => n.id))
+const pngViewBox = computed(() => ({ x: -tf.x / tf.k, y: -tf.y / tf.k, width: VB_W / tf.k, height: VB_H / tf.k }))
+const pngDimensions = computed(() => {
+  let width: number, height: number
+  if (pngScope.value === 'viewport') {
+    width = pngViewBox.value.width; height = pngViewBox.value.height
+  } else if (layout.value.nodes.length) {
+    const x = Math.min(...layout.value.nodes.map((n) => n.x)) - 30
+    const y = Math.min(...layout.value.nodes.map((n) => n.y)) - 30
+    width = Math.max(...layout.value.nodes.map((n) => n.x + n.w)) + 30 - x
+    height = Math.max(...layout.value.nodes.map((n) => n.y + n.h)) + 30 - y
+  } else { width = 200; height = 200 }
+  return { width: Math.max(1, Math.round(width * pngScale.value)), height: Math.max(1, Math.round(height * pngScale.value)) }
+})
 
 function life(m: { birthDate: string; deathDate: string; alive: boolean }): string {
   const b = yearOf(m.birthDate), d = yearOf(m.deathDate)
@@ -58,6 +81,35 @@ function setView(v: 'all' | 'ancestors' | 'descendants'): void {
   view.value = v
   if (v !== 'all' && !focusId.value && data.value.members.length) focusId.value = data.value.members[0].id
   nextTick(fit)
+}
+function setOrientation(value: GraphOrientation): void {
+  orientation.value = value
+  nextTick(fit)
+}
+async function exportPng(): Promise<void> {
+  const current = state.current
+  if (!current || pngBusy.value) return
+  pngBusy.value = true
+  const date = new Date().toISOString().slice(0, 10)
+  const payload = {
+    data: data.value,
+    meta: current,
+    opts: {
+      orientation: orientation.value,
+      scope: pngScope.value,
+      scale: pngScale.value,
+      background: pngBackground.value,
+      legend: pngLegend.value,
+      title: pngTitle.value,
+      timestamp: pngTimestamp.value,
+      visibleIds: visibleIds.value,
+      viewBox: pngViewBox.value,
+    },
+  }
+  const plain = JSON.parse(JSON.stringify(payload)) as typeof payload
+  const file = await run(() => api.graph.savePng(plain, `${current.name}-图谱-${date}.png`))
+  pngBusy.value = false
+  if (file) { showPng.value = false; toast(`PNG 已导出：${file}`) }
 }
 function locate(): void {
   const q = search.value.trim()
@@ -100,7 +152,7 @@ function onMove(e: PointerEvent): void {
 }
 function onUp(): void { panning.value = false }
 
-watch(() => layout.value.width, () => nextTick(fit))
+watch([() => layout.value.width, () => layout.value.height], () => nextTick(fit))
 watch(() => state.graphFocusId, async (id) => {
   if (id) { focusId.value = id; view.value = 'all'; collapsed.clear(); await nextTick(); centerOn(id); detail.value = await api.member.get(id); state.graphFocusId = null }
 })
@@ -126,12 +178,16 @@ onMounted(async () => {
       <button :aria-pressed="view === 'all'" @click="setView('all')">全谱</button>
       <button :aria-pressed="view === 'ancestors'" @click="setView('ancestors')">祖先视图</button>
       <button :aria-pressed="view === 'descendants'" @click="setView('descendants')">后代视图</button>
+      <span class="jp-toolbar-sep" aria-hidden="true"></span>
+      <button :aria-pressed="orientation === 'vertical'" @click="setOrientation('vertical')">纵向树</button>
+      <button :aria-pressed="orientation === 'horizontal'" @click="setOrientation('horizontal')">横向树</button>
       <span style="flex:1"></span>
       <input v-model="search" type="search" placeholder="输入姓名定位" aria-label="图谱搜索定位" style="width:160px" @keydown.enter="locate">
       <button @click="locate">定位</button>
       <button aria-label="缩小" @click="zoom(0.85)">－</button>
       <button aria-label="放大" @click="zoom(1.18)">＋</button>
       <button @click="fit">适应</button>
+      <button class="jp-primary" @click="showPng = true">导出 PNG</button>
     </div>
     <div class="jp-graph-wrap">
       <svg ref="svgEl" :viewBox="`0 0 ${VB_W} ${VB_H}`" :class="{ 'jp-panning': panning }" role="img" aria-label="世系图谱"
@@ -175,6 +231,45 @@ onMounted(async () => {
           <button @click="showMember(detail.id)">成员管理</button>
           <button @click="setView('descendants')">后代视图</button>
         </div>
+      </div>
+    </div>
+
+    <div v-if="showPng" class="jp-modal-mask" @click.self="showPng = false">
+      <div class="jp-op-dialog" role="dialog" aria-modal="true" aria-label="导出图谱 PNG">
+        <div class="proto-dialog-head"><h3>导出关系图谱 PNG</h3><button aria-label="关闭" @click="showPng = false">×</button></div>
+        <p class="jp-muted">导出当前{{ orientation === 'vertical' ? '纵向' : '横向' }}布局，节点与关系均为矢量绘制后栅格化。</p>
+        <div class="jp-form-row" style="margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <label class="jp-field"><span>导出范围</span>
+            <select v-model="pngScope"><option value="viewport">当前视口</option><option value="visible">全部可见节点</option></select>
+          </label>
+          <label class="jp-field"><span>导出倍率</span>
+            <select v-model.number="pngScale"><option :value="1">1× 标准</option><option :value="2">2× 清晰</option><option :value="4">4× 高清</option></select>
+          </label>
+        </div>
+        <div class="jp-field" style="margin-top:12px"><span>背景</span>
+          <div class="jp-skin-cards">
+            <button v-for="bg in [{value:'white',label:'纯白'},{value:'rice',label:'宣纸色'},{value:'transparent',label:'透明'}]" :key="bg.value"
+              class="jp-skin-card" :aria-pressed="pngBackground === bg.value" @click="pngBackground = bg.value as GraphPngOptions['background']">
+              <i class="jp-png-bg" :class="`jp-png-bg-${bg.value}`"></i><b>{{ bg.label }}</b>
+            </button>
+          </div>
+        </div>
+        <div class="jp-form-row" style="margin-top:14px;gap:16px;flex-wrap:wrap">
+          <label><input v-model="pngTitle" type="checkbox">谱名标题</label>
+          <label><input v-model="pngLegend" type="checkbox">关系图例</label>
+          <label><input v-model="pngTimestamp" type="checkbox">导出时间</label>
+        </div>
+        <div class="proto-impact">
+          <div><strong>{{ visibleIds.length }}</strong><span>可见节点</span></div>
+          <div><strong>{{ pngScale }}×</strong><span>导出倍率</span></div>
+          <div><strong>{{ pngDimensions.width.toLocaleString() }}</strong><span>宽度（像素）</span></div>
+          <div><strong>{{ pngDimensions.height.toLocaleString() }}</strong><span>高度（像素）</span></div>
+        </div>
+        <p v-if="pngDimensions.width > 32767 || pngDimensions.height > 32767 || pngDimensions.width * pngDimensions.height > 67108864" class="jp-warning">
+          当前尺寸超过 PNG 安全上限，请选择更小范围或倍率。
+        </p>
+        <div class="proto-warning">透明背景适合嵌入文档；宣纸色更接近传统谱牒质感。导出不会修改家谱数据。</div>
+        <div class="proto-dialog-actions"><button @click="showPng = false">取消</button><button class="jp-primary" :disabled="pngBusy || pngDimensions.width > 32767 || pngDimensions.height > 32767 || pngDimensions.width * pngDimensions.height > 67108864" @click="exportPng">{{ pngBusy ? '正在生成…' : '选择位置并导出' }}</button></div>
       </div>
     </div>
   </div>

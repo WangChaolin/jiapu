@@ -99,7 +99,7 @@ async function revealDir(): Promise<void> { await api.settings.revealDataDir() }
       </div>
       <div class="jp-set-row">
         <span class="jp-set-label">关于</span>
-        <span>家谱管理软件 v{{ state.appInfo?.version }} · Electron + Vue 3 + SQLite（node:sqlite）</span>
+        <span>家谱管理软件 v{{ state.appInfo?.version }}</span>
       </div>
       <div class="jp-set-row">
         <span class="jp-set-label">配置文件</span>

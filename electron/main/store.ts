@@ -255,6 +255,12 @@ export class DataStore {
     return rel.split(path.sep).join('/')
   }
 
+  deletePhoto(genealogyId: string, relPath: string): void {
+    const full = this.resolvePhoto(genealogyId, relPath)
+    if (!full) return
+    try { fs.unlinkSync(full) } catch { /* ignore */ }
+  }
+
   resolvePhoto(genealogyId: string, relPath: string): string | null {
     const base = this.genealogyDir(genealogyId)
     const full = path.resolve(base, relPath)
